@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f9fc" />
+    <meta
+      name="description"
+      content="Find easy, affordable parking near campus. Or turn your empty driveway into extra income with Spotted."
+    />
+    <title>Spotted — campus parking, sorted</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="Spotted home" data-view="browse">
+        <img src="assets/spotted-logo.png" alt="Spotted Parking Services" />
+      </a>
+      <nav class="desktop-nav" aria-label="Main navigation">
+        <a class="nav-link active" href="#explore" data-view="browse">Find parking</a>
+        <a class="nav-link" href="#how-it-works">How it works</a>
+        <a class="nav-link" href="#earn" data-view="list">List your spot</a>
+        <button class="nav-link" type="button" data-bookings>My bookings</button>
+      </nav>
+      <div class="header-actions">
+        <button class="text-button" id="messages-button" type="button" data-open-chat>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-5.5A7.5 7.5 0 1 1 20 11.5Z"/></svg>
+          <span>Messages</span>
+        </button>
+        <button class="avatar-button" id="account-button" type="button" aria-label="Sign in" data-auth>J</button>
+      </div>
+      <button class="mobile-menu-button" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile navigation" hidden>
+        <a href="#explore" data-view="browse">Find parking</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#earn" data-view="list">List your spot</a>
+        <button type="button" data-bookings>My bookings</button>
+        <button type="button" data-open-chat>Messages</button>
+        <button type="button" data-auth id="mobile-account-button">Sign in</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="explore">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span> PARKING, WITHOUT THE PARKING LOT</div>
+          <h1>Campus parking,<br /><span>finally figured out.</span></h1>
+          <p>Skip the lot lottery. Find a spot from someone just around the corner — for exactly as long as you need it.</p>
+          <div class="hero-proof">
+            <div class="proof-avatars" aria-hidden="true"><span>AM</span><span>JL</span><span>KC</span><b>+</b></div>
+            <span><strong>2,400+</strong> happy campus parkers</span>
+            <span class="proof-rating"><span aria-hidden="true">★</span> 4.9</span>
+          </div>
+        </div>
+        <div class="hero-art" aria-label="Illustration of a parking spot near campus">
+          <div class="sun-shape"></div>
+          <div class="art-campus"><div class="campus-roof"></div><div class="campus-main"><span></span><span></span><span></span><span></span><b></b></div><div class="campus-steps"></div></div>
+          <div class="art-tree tree-left"><i></i><b></b></div>
+          <div class="art-tree tree-right"><i></i><b></b></div>
+          <div class="art-road"></div>
+          <div class="art-parking"><span>P</span></div>
+          <div class="art-car"><div class="car-window"></div><span class="wheel wheel-a"></span><span class="wheel wheel-b"></span></div>
+          <div class="art-tag"><span class="tag-pin">✓</span><span><b>You’re right on time</b><small>Your spot is 4 min from campus</small></span></div>
+          <div class="art-caption">A better spot is closer than you think.</div>
+        </div>
+      </section>
+
+      <section class="search-wrap" aria-label="Find a parking spot">
+        <p class="connection-status" id="connection-status" role="status" hidden></p>
+        <form class="search-bar" id="search-form">
+          <label class="search-field city-field">
+            <span class="field-icon pin-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+            </span>
+            <span class="field-content"><span class="field-label">Where are you going?</span><input id="city-input" type="text" value="Boulder, CO" placeholder="City or campus" autocomplete="off" /></span>
+          </label>
+          <label class="search-field area-field">
+            <span class="field-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-5h6v5M9 10h.01M15 10h.01"/></svg>
+            </span>
+            <span class="field-content"><span class="field-label">Park near a building <span class="optional">(optional)</span></span><input id="area-input" type="text" placeholder="e.g. Norlin Library" list="campus-buildings" autocomplete="off" /></span>
+          </label>
+          <datalist id="campus-buildings"></datalist>
+          <label class="search-field date-field">
+            <span class="field-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            </span>
+            <span class="field-content"><span class="field-label">Start date</span><input id="search-date" type="date" /></span>
+          </label>
+          <label class="search-field duration-field">
+            <span class="field-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            </span>
+            <span class="field-content"><span class="field-label">When do you need it?</span><select id="duration-input"><option value="all">Any duration</option><option value="day">A day</option><option value="week">A week</option><option value="month">A month</option><option value="game">Game day</option></select></span>
+          </label>
+          <button class="search-button" type="submit" aria-label="Search parking">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><span>Find a spot</span>
+          </button>
+        </form>
+      </section>
+
+      <section class="main-content" id="results">
+        <div class="results-heading">
+          <div>
+            <div class="section-kicker">GOOD SPOTS. GOOD PEOPLE.</div>
+            <h2><span id="result-title">Spots near CU Boulder</span> <span class="result-count" id="result-count">· 24 spots</span></h2>
+            <p class="results-subtitle">A few great places to start your day.</p>
+          </div>
+          <div class="results-controls">
+            <button class="map-toggle" type="button" id="map-toggle" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></svg>
+              <span>Show map</span>
+            </button>
+            <label class="sort-control"><span>Sort:</span><select id="sort-select" aria-label="Sort parking spots"><option value="recommended">Recommended</option><option value="price">Price: low to high</option></select></label>
+          </div>
+        </div>
+        <div class="filter-row" aria-label="Filter by duration">
+          <button class="filter-chip selected" type="button" data-filter="all">All spots <span data-filter-count="all">6</span></button>
+          <button class="filter-chip" type="button" data-filter="day">Day <span data-filter-count="day">4</span></button>
+          <button class="filter-chip" type="button" data-filter="week">Week <span data-filter-count="week">3</span></button>
+          <button class="filter-chip" type="button" data-filter="month">Month <span data-filter-count="month">3</span></button>
+          <button class="filter-chip" type="button" data-filter="game">Game day <span data-filter-count="game">2</span></button>
+          <div class="filter-spacer"></div>
+          <button class="more-filters" type="button" id="more-filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10m-7 5h4"/><circle cx="8" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="12" cy="17" r="2"/></svg> More filters</button>
+        </div>
+        <div class="map-panel" id="map-panel" hidden>
+          <div class="map-grid"></div>
+          <span class="map-road-label road-label-a">UNIVERSITY AVE</span><span class="map-road-label road-label-b">BROADWAY</span>
+          <span class="map-campus"><b>CU</b> BOULDER</span>
+          <button class="map-pin map-pin-one" type="button" data-map-spot="spot-one">$8<span>/day</span></button>
+          <button class="map-pin map-pin-two" type="button" data-map-spot="spot-two">$6<span>/day</span></button>
+          <button class="map-pin map-pin-three" type="button" data-map-spot="spot-three">$10<span>/day</span></button>
+          <span class="map-you">Campus area</span>
+        </div>
+        <div class="listing-grid" id="listing-grid" aria-live="polite"></div>
+        <div class="empty-state" id="empty-state" hidden>
+          <span class="empty-icon">⌕</span>
+          <h3>No spots found just yet</h3><p>Try another duration or search a nearby area.</p>
+          <button class="button-secondary" type="button" id="reset-search">Clear filters</button>
+        </div>
+        <div class="browse-more"><span>That’s the good stuff (for now).</span><button type="button" id="load-more">Show me more spots <span>↓</span></button></div>
+      </section>
+
+      <section class="owner-banner" id="earn">
+        <div class="owner-illustration" aria-hidden="true">
+          <div class="owner-house"><span></span><i></i><b></b></div><div class="owner-drive"></div>
+          <div class="owner-car"></div><span class="owner-coin">+$</span>
+        </div>
+        <div class="owner-copy"><span class="section-kicker">YOUR EMPTY SPOT HAS POTENTIAL</span><h2>Someone needs your spot.<br /><span>You could use the extra cash.</span></h2><p>List in minutes. Set your schedule, asking price, and Venmo username.</p></div>
+        <div class="owner-cta"><div><b>Up to $240</b><span>earned each month</span></div><button class="button-primary" type="button" data-view="list">List your spot <span aria-hidden="true">→</span></button></div>
+      </section>
+
+      <section class="how-section" id="how-it-works">
+        <div class="how-heading"><div class="section-kicker">A LITTLE LESS STRESS. A LOT MORE PARKING.</div><h2>Easy as <span>one, two, park.</span></h2></div>
+        <div class="steps-grid">
+          <article class="step-card"><span class="step-number">01</span><div class="step-icon step-search"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="14" r="8"/><path d="m20 20 7 7"/></svg></div><h3>Find your fit</h3><p>Search by campus, date, and duration. Find a spot that works for your real life.</p></article>
+          <article class="step-card"><span class="step-number">02</span><div class="step-icon step-key"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="11" cy="17" r="6"/><path d="m16 13 10-10m-4 4 3 3m-7 1 3 3"/></svg></div><h3>Pay your host on Venmo</h3><p>Scan a booking-specific QR code. Your host confirms payment before sharing the exact address.</p></article>
+          <article class="step-card"><span class="step-number">03</span><div class="step-icon step-park"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 27V5h9a7 7 0 0 1 0 14h-9"/><path d="M6 27h20"/></svg></div><h3>Park. You’re there.</h3><p>Skip the circling and start your day closer to where you need to be.</p></article>
+        </div>
+      </section>
+
+      <section class="host-section">
+        <div><span class="section-kicker">GOOD FOR YOUR NEIGHBORHOOD, TOO</span><h2>One less car circling the block.</h2><p>When campus parking works better, everyone gets a little more breathing room.</p></div>
+        <div class="host-stat"><b>4.9<span>/5</span></b><span>average host rating</span></div><div class="host-stat"><b>12k<span>+</span></b><span>hours saved from circling</span></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="#" aria-label="Spotted home" data-view="browse"><img src="assets/spotted-logo.png" alt="Spotted Parking Services" /></a>
+      <span>Better parking. Better days.</span>
+      <div>      <a href="#how-it-works">How it works</a><a href="#earn" data-view="list">List your spot</a><a href="#" data-bookings>My bookings</a></div>
+      <small>© 2026 Spotted</small>
+    </footer>
+
+    <div class="modal-backdrop" id="modal-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="modal-close" type="button" aria-label="Close dialog">×</button>
+        <div id="modal-content"></div>
+      </section>
+    </div>
+
+    <script src="campus-buildings.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
