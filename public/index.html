@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Spotted · Parking near CU Boulder</title>
+  <meta name="description" content="Spotted connects CU Boulder commuters with homeowners who rent out their driveways, garages and lots by the day, week, month or game day." />
+  <meta name="theme-color" content="#1A56E8" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <a class="skip" href="#view">Skip to content</a>
+  <div class="demo-strip" id="demo-strip" hidden></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="#/" class="brand" aria-label="Spotted home"><img src="assets/spotted-logo.png" alt="Spotted Parking Services" width="150" height="42" /></a>
+      <nav class="topnav" aria-label="Main">
+        <a href="#/find" data-nav="find">Find Parking</a>
+        <a href="#/host" data-nav="host">Host a Spot</a>
+        <a href="#/bookings" data-nav="bookings">My Bookings</a>
+      </nav>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </div>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <img src="assets/spotted-logo.png" alt="Spotted" width="110" height="31" />
+      <p>Your spot. Their driveway. Connecting Boulder homeowners with CU commuters.</p>
+      <p class="muted">Questions? <a href="mailto:spottedparking@outlook.com">spottedparking@outlook.com</a></p>
+    </div>
+  </footer>
+
+  <nav class="tabbar" aria-label="App">
+    <a href="#/" data-tab="home"><span class="tab-ico" data-icon="home"></span>Home</a>
+    <a href="#/find" data-tab="find"><span class="tab-ico" data-icon="search"></span>Find</a>
+    <a href="#/bookings" data-tab="bookings"><span class="tab-ico" data-icon="calendar"></span>Bookings</a>
+    <a href="#/messages" data-tab="messages"><span class="tab-ico" data-icon="chat"></span>Chat<span class="dot" hidden></span></a>
+    <a href="#/host" data-tab="host"><span class="tab-ico" data-icon="list"></span>Host</a>
+  </nav>
+
+  <div id="modal-root" hidden></div>
+  <div id="toasts" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

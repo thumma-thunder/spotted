@@ -1,0 +1,8 @@
+// Paste your Supabase project's URL and publishable (anon) key here to go live.
+// Supabase > Project Settings > API. The publishable key is safe to put in a
+// public website: the database's row-level security rules protect the data.
+// Leave them empty to run the site in demo mode (data stays in each browser).
+export const CONFIG = {
+  supabaseUrl: '',
+  supabaseKey: '',
+};
