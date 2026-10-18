@@ -205,44 +205,6 @@ async function loadMarketplace() {
     renderCards();
     console.error(error);
   }
-  await handlePaymentReturn();
-  await handlePayoutReturn();
-}
-
-async function handlePaymentReturn() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("payment") === "success") {
-    showToast("Payment submitted — check My bookings for the confirmed status.");
-  } else if (params.get("payment") === "cancelled") {
-    showToast("Checkout was cancelled. Your card was not charged.");
-  }
-  if (params.has("payment")) {
-    params.delete("payment");
-    const suffix = params.toString();
-    window.history.replaceState({}, "", `${window.location.pathname}${suffix ? `?${suffix}` : ""}`);
-  }
-}
-
-async function handlePayoutReturn() {
-  const params = new URLSearchParams(window.location.search);
-  if (!params.has("payout")) return;
-  try {
-    if (params.get("payout") === "complete" && authSession?.access_token) {
-      const status = await netlifyRequest("/api/payout-status");
-      if (status.connected) await publishPendingListing();
-      else showToast("Stripe needs a little more information before payouts are ready.");
-    } else if (params.get("payout") === "refresh" && authSession?.access_token) {
-      await connectPayouts();
-    } else {
-      showToast("Sign in again to finish setting up payouts.");
-    }
-  } catch (error) {
-    showToast(error.message);
-  } finally {
-    params.delete("payout");
-    const suffix = params.toString();
-    window.history.replaceState({}, "", `${window.location.pathname}${suffix ? `?${suffix}` : ""}`);
-  }
 }
 
 async function netlifyRequest(path, { method = "GET", body } = {}) {
@@ -453,17 +415,17 @@ function bookingForm(spot) {
       : `<option value="1">1 ${spot.unit}</option><option value="2">2 ${spot.unit}s</option><option value="4">4 ${spot.unit}s</option>`;
     openModal(`
       <span class="modal-kicker">A BETTER PARKING DAY STARTS HERE</span><h2 id="modal-title">Book ${escapeHtml(spot.name)}</h2>
-      <p class="modal-lead">Your exact address appears in your booking after checkout. Message your host if you have a question first.</p>
+      <p class="modal-lead">Pay your host directly with Venmo. Your exact address appears after the host confirms your payment.</p>
       <div class="receipt-spot"><div class="photo-fallback">${artSvg(spot.art, spot.color)}</div><div><b>${escapeHtml(spot.name)}</b><span>${escapeHtml(spot.address)} · Hosted by ${escapeHtml(spot.host)}</span></div></div>
-      <form id="checkout-form">
+      <form id="booking-form">
         <div class="form-grid" style="margin-top:15px">
           <div class="form-field"><label for="book-date">Start date</label><input id="book-date" name="date" type="date" value="${initialDate}" min="${minimumDate}" ${spot.availableUntil ? `max="${spot.availableUntil}"` : ""} required></div>
           <div class="form-field"><label for="book-duration">Duration</label><select id="book-duration" name="duration" required>${durationOptions}</select></div>
         </div>
-        <p class="secure-payment-note">Secure checkout is provided by Stripe. Spotted never stores your card details.</p>
-        <div class="spot-bottom booking-total" style="margin-top:13px"><span class="spot-price">${money.format(spot.price)}<small> / ${spot.unit === "game" ? "game" : escapeHtml(spot.unit)}</small></span><span class="booking-estimate">Total before checkout</span></div>
+        <p class="secure-payment-note">You’ll review a Venmo QR code before paying. Spotted does not collect payment details or verify Venmo payments automatically.</p>
+        <div class="spot-bottom booking-total" style="margin-top:13px"><span class="spot-price">${money.format(spot.price)}<small> / ${spot.unit === "game" ? "game" : escapeHtml(spot.unit)}</small></span><span class="booking-estimate">Total due on Venmo</span></div>
         <p class="form-status" id="booking-status" role="status" hidden></p>
-        <div class="modal-actions"><button class="button-primary" type="submit">Continue to secure checkout <span>→</span></button></div>
+        <div class="modal-actions"><button class="button-primary" type="submit">Continue to Venmo payment <span>→</span></button></div>
       </form>
     `);
     document.querySelector("#book-duration").addEventListener("change", (event) => {
@@ -586,6 +548,53 @@ function messagesDialog() {
   });
 }
 
+function paymentQrDialog(booking) {
+  const username = String(booking.venmoUsername || "").replace(/^@/, "");
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{4,29}$/.test(username)
+    || !Number.isSafeInteger(booking.totalCents)
+    || booking.totalCents < 100
+    || !/^[0-9a-f-]{36}$/i.test(booking.id)) {
+    showToast("The Venmo payment details for this booking are invalid.");
+    return;
+  }
+  const paymentParams = new URLSearchParams({
+    txn: "pay",
+    recipients: username,
+    amount: (booking.totalCents / 100).toFixed(2),
+    note: `Spotted ${booking.id.slice(0, 8)}`,
+  });
+  const venmoUri = `venmo://paycharge?${paymentParams}`;
+  const profileUrl = `https://venmo.com/u/${encodeURIComponent(username)}`;
+  const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&format=svg&data=${encodeURIComponent(venmoUri)}`;
+  openModal(`
+    <span class="modal-kicker">PAY YOUR HOST DIRECTLY</span><h2 id="modal-title">Scan with Venmo</h2>
+    <p class="modal-lead">Send <strong>${money.format(booking.totalCents / 100)}</strong> to <strong>@${escapeHtml(username)}</strong>. Include the booking reference so your host can match your payment.</p>
+    <div class="venmo-payment-card">
+      <img class="venmo-qr" src="${escapeHtml(qrImage)}" alt="Venmo payment QR code for @${escapeHtml(username)}" width="240" height="240">
+      <a class="button-primary venmo-open" href="${escapeHtml(venmoUri)}">Open Venmo <span aria-hidden="true">→</span></a>
+      <a class="venmo-profile" href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener noreferrer">Open @${escapeHtml(username)}’s Venmo profile</a>
+      <p>Reference: <strong>${escapeHtml(booking.id.slice(0, 8))}</strong></p>
+    </div>
+    <p class="secure-payment-note">Spotted can’t verify Venmo payments. Only mark it sent after you complete the payment. Your host must confirm receipt before the parking address is shared.</p>
+    <div class="modal-actions"><button class="button-primary" type="button" data-booking-action="payment_sent" data-booking-id="${escapeHtml(booking.id)}">I sent the payment</button></div>
+  `);
+}
+
+async function updateBookingPayment(bookingId, action) {
+  await supabaseRequest("rpc/update_booking_payment", {
+    method: "POST",
+    body: { p_booking_id: bookingId, p_action: action },
+  });
+  closeModal();
+  const messages = {
+    payment_sent: "Payment marked as sent. Your host will confirm it in My bookings.",
+    confirm: "Payment confirmed. The renter can now see the parking address.",
+    reject: "Payment not confirmed. The reservation was released.",
+    cancel: "Reservation cancelled.",
+  };
+  showToast(messages[action]);
+}
+
 async function bookingHistoryDialog() {
   requireAuth(async () => {
     try {
@@ -593,52 +602,48 @@ async function bookingHistoryDialog() {
       const rows = bookings.map((booking) => {
         const lastDay = new Date(`${booking.end_date}T12:00:00`);
         lastDay.setDate(lastDay.getDate() - 1);
+        const isRenter = booking.renter_id === authUser.id;
+        const statusLabels = {
+          payment_pending: "Payment pending",
+          payment_submitted: "Payment sent · awaiting host",
+          confirmed: "Confirmed",
+          cancelled: "Cancelled",
+        };
+        let actions = "";
+        let paymentNote = "";
+        if (isRenter && booking.status === "payment_pending") {
+          paymentNote = "Pay the host with Venmo. Your dates are held while payment is pending. If you already paid, contact the host before cancelling.";
+          actions = `<button class="button-secondary" type="button" data-payment-qr data-booking-id="${escapeHtml(booking.id)}" data-venmo-username="${escapeHtml(booking.venmo_username || "")}" data-total-cents="${booking.total_cents}">Show Venmo QR</button> <button class="button-secondary" type="button" data-booking-action="cancel" data-booking-id="${escapeHtml(booking.id)}">Cancel unpaid reservation</button>`;
+        } else if (isRenter && booking.status === "payment_submitted") {
+          paymentNote = "Waiting for the host to confirm your Venmo payment.";
+        } else if (!isRenter && booking.status === "payment_submitted") {
+          paymentNote = "Check your Venmo account before confirming the renter’s payment.";
+          actions = `<button class="button-primary" type="button" data-booking-action="confirm" data-booking-id="${escapeHtml(booking.id)}">Confirm payment</button> <button class="button-secondary" type="button" data-booking-action="reject" data-booking-id="${escapeHtml(booking.id)}">Payment not received</button>`;
+        } else if (!isRenter && booking.status === "payment_pending") {
+          paymentNote = "Waiting for the renter to send payment.";
+        }
         return `
           <article class="booking-entry">
-            <div><span class="booking-state state-${escapeHtml(booking.status)}">${escapeHtml(booking.status.replaceAll("_", " "))}</span><h3>${escapeHtml(booking.spot_title)}</h3>
+            <div><span class="booking-state state-${escapeHtml(booking.status)}">${escapeHtml(statusLabels[booking.status] || booking.status)}</span><h3>${escapeHtml(booking.spot_title)}</h3>
               <p>${escapeHtml(booking.neighborhood || booking.city)} · ${new Date(`${booking.start_date}T12:00:00`).toLocaleDateString()} – ${lastDay.toLocaleDateString()}</p>
               ${booking.street_address ? `<p class="booking-address">${escapeHtml(booking.street_address)}</p>` : ""}
+              ${paymentNote ? `<p>${escapeHtml(paymentNote)}</p>` : ""}
+              ${actions ? `<div class="booking-actions">${actions}</div>` : ""}
             </div><strong>${money.format(booking.total_cents / 100)}</strong>
           </article>`;
       }).join("");
-      openModal(`<span class="modal-kicker">YOUR PARKING PLANS</span><h2 id="modal-title">My bookings</h2><p class="modal-lead">${bookings.length ? "Your reservations, all in one place." : "No bookings yet. Find a spot close to your next class."}</p><div class="booking-list">${rows || '<a class="button-secondary booking-find" href="#explore" data-view="browse">Explore parking</a>'}</div>`);
+      openModal(`<span class="modal-kicker">YOUR PARKING PLANS</span><h2 id="modal-title">My bookings</h2><p class="modal-lead">${bookings.length ? "Venmo payments are sent directly to hosts. Hosts confirm receipt before a booking is complete." : "No bookings yet. Find a spot close to your next class."}</p><div class="booking-list">${rows || '<a class="button-secondary booking-find" href="#explore" data-view="browse">Explore parking</a>'}</div>`);
     } catch (error) {
       showToast(error.message);
     }
   });
 }
 
-async function connectPayouts() {
-  const result = await netlifyRequest("/api/connect-payouts", { method: "POST", body: {} });
-  window.location.assign(result.url);
-}
-
-async function publishPendingListing() {
-  const draft = JSON.parse(sessionStorage.getItem("spotted.pendingListing") || "null");
-  if (!draft || !authUser) return;
-  await supabaseRequest("spots", {
-    method: "POST",
-    prefer: "return=minimal",
-    body: draft.map((spot) => ({ ...spot, owner_id: authUser.id })),
-  });
-  sessionStorage.removeItem("spotted.pendingListing");
-  document.querySelector("#city-input").value = draft[0].city;
-  document.querySelector("#area-input").value = "";
-  document.querySelector("#search-date").value = "";
-  document.querySelector("#duration-input").value = "all";
-  activeFilter = "all";
-  document.querySelectorAll(".filter-chip").forEach((chip) => chip.classList.toggle("selected", chip.dataset.filter === "all"));
-  const listings = await supabaseRequest("public_spots?select=*&order=created_at.desc");
-  spots.splice(0, spots.length, ...listings.map(mapDatabaseSpot), ...demoSpots);
-  renderCards();
-  showToast("Your spot is live. Your bank details are managed securely by Stripe.");
-}
-
 function listingDialog() {
   requireAuth(() => {
     openModal(`
     <span class="modal-kicker">A LITTLE EXTRA ROOM. A LITTLE EXTRA INCOME.</span><h2 id="modal-title">Put your parking spot to work.</h2>
-    <p class="modal-lead">List one space or a few, set your own price, and choose when it’s available. Stripe securely handles payout setup.</p>
+    <p class="modal-lead">List one space or a few, set your own price, and choose when it’s available. Renters pay you directly through Venmo.</p>
     <form id="listing-form">
       <div class="form-field full" style="margin-bottom:15px"><label>How many spots are you listing?</label><div class="spot-choice"><input type="radio" name="spot-count" id="one-spot" value="1" checked><div><b>One spot</b><span>Start with your driveway, garage, or parking space</span></div></div><div class="spot-choice"><input type="radio" name="spot-count" id="multiple-spots" value="multiple"><div><b>Multiple spots</b><span>List two or more spaces at the same address</span></div></div></div>
       <div id="extra-spots" class="form-field full" hidden style="margin-bottom:14px"><label for="spot-quantity">Number of spots</label><input id="spot-quantity" name="spot-quantity" type="number" min="2" max="20" value="2"></div>
@@ -651,11 +656,12 @@ function listingDialog() {
         <div class="form-field"><label for="listing-available-until">Available through <span class="optional">(optional)</span></label><input id="listing-available-until" name="available-until" type="date"></div>
         <div class="form-field"><label for="listing-type">Spot type</label><select id="listing-type" name="type"><option>Driveway</option><option>Garage</option><option>Private lot</option><option>Covered space</option></select></div>
         <div class="form-field"><label for="listing-use">Price per</label><select id="listing-use" name="use"><option value="day">Day</option><option value="week">Week</option><option value="game">CU football game</option><option value="month">Month</option></select></div>
+        <div class="form-field full"><label for="listing-venmo">Your Venmo username</label><input id="listing-venmo" name="venmo" placeholder="@your-username" minlength="5" maxlength="31" pattern="@?[A-Za-z0-9][A-Za-z0-9_.-]{4,29}" autocomplete="off" required><small class="field-help">Renters use this to pay you after they reserve. Enter your username, with or without @.</small></div>
       </div>
       <div class="price-panel"><div class="price-panel-head"><span>Suggested price near campus<br>Slide to set your own asking price</span><strong id="asking-price">$8 <small>/ day</small></strong></div><input id="price-slider" type="range" min="4" max="40" step="1" value="8" aria-label="Set asking price"><div class="range-labels"><span>More bookings · $4</span><span>Higher earnings · $40</span></div></div>
-      <p class="secure-payment-note">Payout details are entered directly with Stripe Express. Spotted does not collect or store bank account numbers.</p>
+      <p class="secure-payment-note">Venmo payments go directly to you. Spotted does not hold funds or automatically verify payment; use an account type Venmo allows for payments for goods or services.</p>
       <p class="form-status" id="listing-status" role="status" hidden></p>
-      <div class="modal-actions"><button class="button-primary" type="submit">Continue to secure payout setup <span>→</span></button></div>
+      <div class="modal-actions"><button class="button-primary" type="submit">Publish your spot <span>→</span></button></div>
     </form>
   `);
   const ranges = { day: [4, 40, 8], week: [25, 180, 38], game: [10, 100, 24], month: [80, 400, 120] };
@@ -690,6 +696,7 @@ function listingDialog() {
       const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const fields = new FormData(form);
+      const venmoUsername = String(fields.get("venmo")).trim().replace(/^@/, "");
       const count = fields.get("spot-count") === "multiple" ? Number(fields.get("spot-quantity")) : 1;
       const spotType = String(fields.get("type")).toLowerCase();
       const start = String(fields.get("available-from"));
@@ -720,17 +727,30 @@ function listingDialog() {
       const submit = form.querySelector('button[type="submit"]');
       submit.disabled = true;
       status.hidden = false;
-      status.textContent = "Checking secure payout setup…";
+      status.textContent = "Publishing your spot…";
       try {
-        if (!supabaseConfig) throw new Error("Listings are read-only in preview mode. Deploy with your Supabase and Stripe settings to publish a real spot.");
-        sessionStorage.setItem("spotted.pendingListing", JSON.stringify(draft));
-        const payoutStatus = await netlifyRequest("/api/payout-status");
-        if (payoutStatus.connected) {
-          await publishPendingListing();
-          closeModal();
-        } else {
-          await connectPayouts();
-        }
+        if (!supabaseConfig) throw new Error("Listings are read-only in preview mode. Deploy with your Supabase settings to publish a real spot.");
+        await supabaseRequest(`profiles?id=eq.${encodeURIComponent(authUser.id)}`, {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { venmo_username: venmoUsername },
+        });
+        await supabaseRequest("spots", {
+          method: "POST",
+          prefer: "return=minimal",
+          body: draft.map((spot) => ({ ...spot, owner_id: authUser.id })),
+        });
+        document.querySelector("#city-input").value = draft[0].city;
+        document.querySelector("#area-input").value = "";
+        document.querySelector("#search-date").value = "";
+        document.querySelector("#duration-input").value = "all";
+        activeFilter = "all";
+        document.querySelectorAll(".filter-chip").forEach((chip) => chip.classList.toggle("selected", chip.dataset.filter === "all"));
+        const listings = await supabaseRequest("public_spots?select=*&order=created_at.desc");
+        spots.splice(0, spots.length, ...listings.map(mapDatabaseSpot), ...demoSpots);
+        renderCards();
+        closeModal();
+        showToast("Your spot is live. Renters can pay you directly through Venmo.");
       } catch (error) {
         status.textContent = error.message;
         status.dataset.state = "error";
@@ -867,16 +887,16 @@ document.addEventListener("keydown", (event) => {
 });
 modalContent.addEventListener("submit", async (event) => {
   const form = event.target;
-  if (form.id !== "checkout-form") return;
+  if (form.id !== "booking-form") return;
   event.preventDefault();
   if (!form.reportValidity()) return;
   const submit = form.querySelector('button[type="submit"]');
   const status = document.querySelector("#booking-status");
   submit.disabled = true;
   status.hidden = false;
-  status.textContent = "Creating your secure checkout…";
+  status.textContent = "Preparing your Venmo payment…";
   try {
-    const result = await netlifyRequest("/api/create-checkout", {
+    const result = await netlifyRequest("/api/create-booking", {
       method: "POST",
       body: {
         spotId: currentSpot.id,
@@ -884,7 +904,11 @@ modalContent.addEventListener("submit", async (event) => {
         quantity: Number(document.querySelector("#book-duration").value),
       },
     });
-    window.location.assign(result.url);
+    paymentQrDialog({
+      id: result.bookingId,
+      totalCents: result.totalCents,
+      venmoUsername: result.venmoUsername,
+    });
   } catch (error) {
     status.textContent = error.message;
     status.dataset.state = "error";
@@ -897,6 +921,24 @@ modalContent.addEventListener("click", (event) => {
     storeSession(null);
     closeModal();
     showToast("You’re signed out.");
+  }
+  const paymentAction = event.target.closest("[data-booking-action]");
+  if (paymentAction) {
+    paymentAction.disabled = true;
+    updateBookingPayment(paymentAction.dataset.bookingId, paymentAction.dataset.bookingAction).catch((error) => {
+      paymentAction.disabled = false;
+      showToast(error.message);
+    });
+    return;
+  }
+  const paymentQr = event.target.closest("[data-payment-qr]");
+  if (paymentQr) {
+    paymentQrDialog({
+      id: paymentQr.dataset.bookingId,
+      venmoUsername: paymentQr.dataset.venmoUsername,
+      totalCents: Number(paymentQr.dataset.totalCents),
+    });
+    return;
   }
   if (event.target.closest("[data-auth-mode]")) authDialog(event.target.closest("[data-auth-mode]").dataset.authMode);
   const conversation = event.target.closest("[data-conversation-spot]");

@@ -58,23 +58,6 @@ export async function databaseRequest(path, init = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-export async function stripeRequest(path, init = {}) {
-  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${requiredEnv("STRIPE_SECRET_KEY")}`,
-      ...init.headers,
-    },
-    signal: AbortSignal.timeout(15000),
-  });
-  const result = await response.json();
-  if (!response.ok) {
-    const status = response.status >= 500 ? 502 : response.status;
-    throw new HttpError(status, result.error?.message || "Stripe could not complete the request.");
-  }
-  return result;
-}
-
 export async function readJson(request) {
   try {
     return await request.json();

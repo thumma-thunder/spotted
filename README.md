@@ -2,9 +2,9 @@
 
 Spotted is a responsive campus-parking marketplace website. Commuters can search by city, CU Boulder building, date, and parking duration; hosts can list one or many spaces and set their price; members can message about a listing and manage bookings.
 
-## Netlify and free-tier setup
+## Netlify and Supabase setup
 
-The static website and serverless endpoints deploy on Netlify. Supabase supplies Postgres and email/password authentication on its free plan; Stripe Connect handles card checkout and host payouts. Supabase's free projects include 500 MB of database storage and can pause after a week without activity. Netlify's free-plan allowances and Stripe processing fees apply. This setup has no required paid monthly app subscription, but free tiers have limits and payment processors charge per transaction.
+The static website and serverless endpoints deploy on Netlify. Supabase supplies Postgres and email/password authentication. Parking payments go directly from renters to hosts through Venmo; Spotted does not process or hold funds. Free-tier limits and Venmo's own terms apply.
 
 ### 1. Create the Supabase database
 
@@ -17,41 +17,42 @@ The static website and serverless endpoints deploy on Netlify. Supabase supplies
    npx supabase db push
    ```
 
-   The migration in `supabase/migrations/` creates the profile, spot, booking, inbox, and payment-event schema, plus row-level security policies. Public search uses a safe view that never returns a host's street address. The address is returned to the renter only after a booking is paid and confirmed.
+   The migration in `supabase/migrations/` creates the profile, spot, booking, inbox, and payment-status schema, plus row-level security policies. Public search does not return hosts' street addresses. A renter sees the address only after the host confirms payment.
 3. In Supabase **Project Settings → API Keys**, copy the project URL, publishable key, and server-only secret key. Keep the secret key private.
-4. In **Authentication → URL Configuration**, set the site URL to the Netlify site's HTTPS URL. Add that URL to the allowed redirect URLs so account confirmation links return to the site.
+4. In **Authentication → URL Configuration**, set the site URL to the Netlify site's HTTPS URL and add that URL to allowed redirect URLs.
 
-### 2. Set up Stripe Connect
+### 2. Deploy to Netlify
 
-1. Create a Stripe account and enable Connect with Express accounts. Hosts enter bank and identity information on Stripe-hosted onboarding pages; Spotted never collects it.
-2. For a test deployment, use Stripe test-mode credentials. Add a webhook endpoint at `https://YOUR_SITE/api/stripe-webhook` and subscribe to:
-   - `checkout.session.completed`
-   - `checkout.session.async_payment_succeeded`
-   - `checkout.session.expired`
-3. Copy the webhook signing secret. Use Stripe's test cards until your platform and Connect account have been verified. Stripe's processing fees apply to successful charges.
-
-### 3. Deploy to Netlify
-
-1. Import this repository from GitHub in Netlify. The checked-in `netlify.toml` publishes the site and routes `/api/*` requests to Netlify Functions.
-2. Set these environment variables in **Site configuration → Environment variables**. Use the Supabase secret key only for server-side functions.
+1. Import this repository from GitHub in Netlify. `netlify.toml` builds the static site and routes `/api/*` to Netlify Functions.
+2. Set these environment variables in **Site configuration → Environment variables**:
 
    | Variable | Value |
    | --- | --- |
    | `SUPABASE_URL` | Supabase project URL |
    | `SUPABASE_PUBLISHABLE_KEY` | Supabase public publishable key |
-   | `SUPABASE_SECRET_KEY` | Supabase private secret key |
-   | `STRIPE_SECRET_KEY` | Stripe secret key (`sk_test_…` for testing) |
-   | `STRIPE_WEBHOOK_SECRET` | Stripe endpoint signing secret (`whsec_…`) |
+   | `SUPABASE_SECRET_KEY` | Supabase private secret key; server-side only |
 
-3. Deploy the site. No client-side card or bank data, Stripe secret, or Supabase secret key is placed in the published files.
+3. Deploy the site. The Supabase secret key is not included in the published files.
+
+### Venmo payments
+
+Hosts add their Venmo username when listing a space. Renters receive a QR code and Venmo app link for the exact amount and booking reference, pay the host directly, then mark the payment as sent. Hosts must check Venmo and confirm receipt before the booking is confirmed and the parking address is revealed. Spotted cannot verify, reverse, or protect direct Venmo payments. Hosts should use an account type Venmo allows for payments for goods or services.
+
+The QR image is rendered by QRServer and contains the host's public Venmo username, amount, and a short booking reference. Payment is initiated through Venmo's `venmo://paycharge` link. Do not include sensitive information in the Venmo username or payment note.
 
 ### Local preview
 
-Open `index.html` to review the responsive preview listings. They are sample content and cannot be booked, messaged, or published. To test live functions locally, copy `.env.example` to `.env`, fill in test credentials, link the Supabase project, apply its migration, and run:
+Open `index.html` to review the responsive preview listings. They are sample content and cannot be booked, messaged, or published. To test live functions locally, copy `.env.example` to `.env`, fill in Supabase credentials, link the Supabase project, apply its migration, and run:
 
 ```powershell
 node scripts/build.mjs
 npx netlify-cli dev
 ```
 
-Never use live Stripe keys in a local `.env` or commit `.env`; keep all real credentials in Netlify's environment-variable settings.
+Run the credential-free booking function tests with:
+
+```powershell
+node --test tests/create-booking.test.mjs
+```
+
+Never commit `.env`; keep the Supabase secret key in Netlify's environment-variable settings for hosted deployments.

@@ -308,6 +308,16 @@ body { background: #fbfcff; color: var(--ink); }
 .state-cancelled { background: #f4f5f7; color: #6d7582; }
 .booking-address { color: #2d4b78 !important; font-weight: 700; }
 .booking-find { justify-self: start; }
+.booking-actions { margin-top: 10px; }
+.booking-actions button { min-height: 34px; margin: 3px 4px 0 0; padding: 0 10px; font-size: 11px; }
+.state-payment_submitted { background: #fff3e9; color: #a44d19; }
+.venmo-payment-card { display: grid; justify-items: center; gap: 13px; margin: 17px auto; padding: 18px; max-width: 330px; border: 1px solid #e3e9f2; border-radius: 14px; background: #f8faff; text-align: center; }
+.venmo-qr { display: block; width: 240px; max-width: 100%; height: auto; padding: 7px; border: 1px solid #e4e9f0; border-radius: 8px; background: #fff; }
+.venmo-open { min-height: 42px; padding: 0 17px; text-decoration: none; }
+.venmo-profile { color: var(--blue); font-size: 11px; font-weight: 700; text-decoration: none; }
+.venmo-profile:hover { text-decoration: underline; }
+.venmo-payment-card p { margin: 0; color: #65758d; font-size: 11px; }
+.field-help { display: block; margin-top: 5px; color: #718098; font-size: 10px; }
 .inbox-entry { display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid #e3e9f2; border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
 .inbox-entry > span:nth-child(2) { flex: 1; display: grid; gap: 4px; }
 .inbox-entry strong { color: #233957; font-size: 13px; }

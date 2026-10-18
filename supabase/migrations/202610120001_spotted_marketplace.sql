@@ -4,8 +4,7 @@ create extension if not exists btree_gist;
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null default 'Spotted member',
-  stripe_account_id text unique,
-  payouts_enabled boolean not null default false,
+  venmo_username text check (venmo_username is null or venmo_username ~ '^[A-Za-z0-9][A-Za-z0-9_.-]{4,29}$'),
   created_at timestamptz not null default now()
 );
 
@@ -86,15 +85,13 @@ create table public.bookings (
   end_date date not null,
   quantity integer not null check (quantity between 1 and 30),
   total_cents integer not null check (total_cents between 100 and 1000000),
-  status text not null check (status in ('payment_pending', 'confirmed', 'cancelled')),
-  stripe_checkout_session_id text unique,
-  stripe_payment_intent_id text unique,
+  status text not null check (status in ('payment_pending', 'payment_submitted', 'confirmed', 'cancelled')),
   created_at timestamptz not null default now(),
   check (end_date > start_date),
   exclude using gist (
     spot_id with =,
     daterange(start_date, end_date, '[)') with &&
-  ) where (status in ('payment_pending', 'confirmed'))
+  ) where (status in ('payment_pending', 'payment_submitted', 'confirmed'))
 );
 
 create index bookings_renter_id_created_idx on public.bookings (renter_id, created_at desc);
@@ -115,12 +112,14 @@ select
   spots.title as spot_title,
   spots.city,
   spots.neighborhood,
+  owner.venmo_username,
   case
     when bookings.status = 'confirmed' and bookings.renter_id = (select auth.uid()) then spots.street_address
     else null
   end as street_address
 from public.bookings
 join public.spots on spots.id = bookings.spot_id
+join public.profiles as owner on owner.id = spots.owner_id
 where bookings.renter_id = (select auth.uid())
    or spots.owner_id = (select auth.uid());
 
@@ -161,46 +160,46 @@ left join public.profiles as renter on renter.id = conversations.renter_id
 where conversations.renter_id = (select auth.uid())
    or conversations.owner_id = (select auth.uid());
 
-create table public.stripe_events (
-  event_id text primary key,
-  received_at timestamptz not null default now()
-);
-
 alter table public.profiles enable row level security;
 alter table public.spots enable row level security;
 alter table public.bookings enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
-alter table public.stripe_events enable row level security;
 
-revoke all on public.profiles, public.spots, public.bookings, public.conversations, public.messages, public.stripe_events from anon, authenticated;
+revoke all on public.profiles, public.spots, public.bookings, public.conversations, public.messages from anon, authenticated;
 grant usage on schema public to anon, authenticated;
 grant select on public.public_spots to anon, authenticated;
 grant select on public.profiles to authenticated;
 grant select on public.my_bookings to authenticated;
 grant select on public.my_conversations to authenticated;
 grant select, insert, update, delete on public.spots to authenticated;
+grant update (venmo_username) on public.profiles to authenticated;
 grant select on public.bookings to authenticated;
 grant select, insert on public.conversations to authenticated;
 grant select, insert on public.messages to authenticated;
-grant all on public.profiles, public.spots, public.bookings, public.conversations, public.messages, public.stripe_events to service_role;
+grant all on public.profiles, public.spots, public.bookings, public.conversations, public.messages to service_role;
 
 create policy "Owners can read their profiles"
   on public.profiles for select to authenticated
   using (id = (select auth.uid()));
 
+create policy "Members can update their own Venmo username"
+  on public.profiles for update to authenticated
+  using (id = (select auth.uid()))
+  with check (id = (select auth.uid()));
+
 create policy "Owners can read and manage their spots"
   on public.spots for select to authenticated
   using (owner_id = (select auth.uid()));
 
-create policy "Payout-ready hosts can create spots"
+create policy "Members with a Venmo username can create spots"
   on public.spots for insert to authenticated
   with check (
     owner_id = (select auth.uid())
     and exists (
       select 1 from public.profiles
       where profiles.id = (select auth.uid())
-        and profiles.payouts_enabled
+        and profiles.venmo_username is not null
     )
   );
 
@@ -275,59 +274,45 @@ create policy "Conversation participants can send messages as themselves"
     )
   );
 
-create function public.apply_stripe_event(
-  p_event_id text,
-  p_booking_id uuid,
-  p_status text,
-  p_checkout_session_id text,
-  p_payment_intent_id text,
-  p_amount_total integer,
-  p_currency text
-)
+create function public.update_booking_payment(p_booking_id uuid, p_action text)
 returns void
 language plpgsql
 security definer
 set search_path = ''
 as $$
 begin
-  if p_status not in ('confirmed', 'cancelled') then
-    raise exception 'Invalid booking status';
-  end if;
-
-  insert into public.stripe_events (event_id)
-  values (p_event_id)
-  on conflict do nothing;
-  if not found then return; end if;
-
-  if p_status = 'confirmed' then
+  if p_action = 'payment_sent' then
     update public.bookings
-    set status = 'confirmed',
-        stripe_payment_intent_id = p_payment_intent_id
+    set status = 'payment_submitted'
     where id = p_booking_id
-      and status = 'payment_pending'
-      and stripe_checkout_session_id = p_checkout_session_id
-      and total_cents = p_amount_total
-      and p_currency = 'usd';
-    if not found and not exists (
-      select 1 from public.bookings
-      where id = p_booking_id
-        and status = 'confirmed'
-        and stripe_checkout_session_id = p_checkout_session_id
-        and stripe_payment_intent_id = p_payment_intent_id
-        and total_cents = p_amount_total
-        and p_currency = 'usd'
-    ) then
-      raise exception 'Paid Stripe session does not match its booking';
-    end if;
-  else
+      and renter_id = (select auth.uid())
+      and status = 'payment_pending';
+  elsif p_action in ('confirm', 'reject') then
+    update public.bookings
+    set status = case when p_action = 'confirm' then 'confirmed' else 'cancelled' end
+    where id = p_booking_id
+      and status = 'payment_submitted'
+      and exists (
+        select 1
+        from public.spots
+        where spots.id = bookings.spot_id
+          and spots.owner_id = (select auth.uid())
+      );
+  elsif p_action = 'cancel' then
     update public.bookings
     set status = 'cancelled'
     where id = p_booking_id
-      and status = 'payment_pending'
-      and stripe_checkout_session_id = p_checkout_session_id;
+      and renter_id = (select auth.uid())
+      and status = 'payment_pending';
+  else
+    raise exception 'Invalid booking action';
+  end if;
+
+  if not found then
+    raise exception 'Booking not found or action is not allowed for its current status';
   end if;
 end;
 $$;
 
-revoke all on function public.apply_stripe_event(text, uuid, text, text, text, integer, text) from public, anon, authenticated;
-grant execute on function public.apply_stripe_event(text, uuid, text, text, text, integer, text) to service_role;
+revoke all on function public.update_booking_payment(uuid, text) from public, anon;
+grant execute on function public.update_booking_payment(uuid, text) to authenticated;
