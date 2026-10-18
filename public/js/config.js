@@ -3,6 +3,6 @@
 // public website: the database's row-level security rules protect the data.
 // Leave them empty to run the site in demo mode (data stays in each browser).
 export const CONFIG = {
-  supabaseUrl: '',
-  supabaseKey: '',
+  supabaseUrl: 'https://chmphpxpfnejilkwzinj.supabase.co',
+  supabaseKey: 'sb_publishable_UTdl5Lf6ymdW3SIUir8WhA_gWdKvs4z',
 };
