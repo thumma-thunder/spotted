@@ -1,10 +1,14 @@
 import { esc, icon, money, PERIODS, SPOT_TYPES, headlinePrice, todayISO, parseISO, endDateFor, photoOf, rating, fmtDate } from '../ui.js';
+import { mountBuildingPicker, buildingByCode, milesBetween } from '../buildings-picker.js';
+import { spotPoint } from '../geo.js';
 
-const DEFAULTS = { city: 'Boulder, CO', area: '', date: todayISO(), from: '08:00', to: '17:00', period: 'any', sort: 'price_asc', avail: '' };
+const DEFAULTS = { city: 'Boulder, CO', near: '', date: todayISO(), from: '08:00', to: '17:00', period: 'any', sort: 'price_asc', avail: '' };
 
 export default async function find(view, { store, query, go }) {
   const q = { ...DEFAULTS, ...query };
   if (q.date < todayISO()) q.date = todayISO();
+  const near = buildingByCode(q.near);
+  if (near && !query.sort) q.sort = 'distance';
 
   view.innerHTML = `
   <section class="find-hero">
@@ -17,9 +21,11 @@ export default async function find(view, { store, query, go }) {
             <div class="input-icon">${icon('pin')}<input name="city" list="cities" value="${esc(q.city)}" required autocomplete="address-level2" /></div>
             <datalist id="cities"><option value="Boulder, CO"></option></datalist>
           </label>
-          <label class="field"><span>Area (optional)</span>
-            <input name="area" value="${esc(q.area)}" placeholder="e.g., University Hill, Goss-Grove" />
-          </label>
+          <div class="field"><label for="bld"><span class="label sm">CU building (optional)</span></label>
+            <div class="picker"><div class="input-icon">${icon('search')}<input id="bld" placeholder="e.g., Norlin, Koelbel, Engineering" /></div>
+              <button type="button" class="picker-clear" aria-label="Clear building">${icon('close')}</button>
+              <input type="hidden" name="near" value="${esc(q.near)}" /></div>
+          </div>
           <label class="field"><span>Date</span>
             <div class="input-icon">${icon('calendar')}<input name="date" type="date" min="${todayISO()}" value="${esc(q.date)}" required /></div>
           </label>
@@ -47,7 +53,7 @@ export default async function find(view, { store, query, go }) {
         <select id="sort" aria-label="Sort results">
           <option value="price_asc">Price: Low to High</option>
           <option value="price_desc">Price: High to Low</option>
-          <option value="distance">Closest to campus</option>
+          <option value="distance">${near ? 'Closest to building' : 'Closest to campus'}</option>
         </select>
       </label>
     </div>
@@ -60,9 +66,11 @@ export default async function find(view, { store, query, go }) {
 
   const toQuery = () => {
     const fd = new FormData(form);
-    const next = { city: fd.get('city').trim(), area: fd.get('area').trim(), date: fd.get('date'), from: fd.get('from'), to: fd.get('to'), period: fd.get('period'), sort: sortSel.value, avail: fd.get('avail') ? '1' : '' };
+    picker.commit();
+    const next = { city: fd.get('city').trim(), near: form.near.value, date: fd.get('date'), from: fd.get('from'), to: fd.get('to'), period: fd.get('period'), sort: sortSel.value, avail: fd.get('avail') ? '1' : '' };
     return new URLSearchParams(Object.entries(next).filter(([k, v]) => v && v !== DEFAULTS[k])).toString();
   };
+  const picker = mountBuildingPicker(view.querySelector('#bld'), form.near, { onChange: () => form.requestSubmit() });
   form.addEventListener('submit', (e) => { e.preventDefault(); go(`/find${toQuery() ? `?${toQuery()}` : ''}`); });
   sortSel.addEventListener('change', () => form.requestSubmit());
   form.avail.addEventListener('change', () => form.requestSubmit());
@@ -74,12 +82,10 @@ export default async function find(view, { store, query, go }) {
   ]);
 
   const cityKey = q.city.split(',')[0].trim().toLowerCase();
-  const areaKey = q.area.toLowerCase();
   const dow = parseISO(q.date).getDay();
   const results = spots
     .filter((s) => s.status === 'active')
     .filter((s) => !cityKey || s.city.toLowerCase().includes(cityKey))
-    .filter((s) => !areaKey || s.area.toLowerCase().includes(areaKey) || s.title.toLowerCase().includes(areaKey))
     .filter((s) => q.period === 'any' || s.rent_options.includes(q.period))
     .map((s) => {
       const nextGame = s.event_dates?.filter((d) => d >= q.date).sort()[0];
@@ -91,7 +97,9 @@ export default async function find(view, { store, query, go }) {
       const taken = booked.filter((b) => b.spot_id === s.id).length;
       const full = taken >= s.spot_count;
       const { period, cents } = headlinePrice(s, q.period === 'any' ? null : q.period);
-      return { s, usable, full, period, cents, nextGame };
+      const pt = spotPoint(s);
+      const dist = near ? (pt ? milesBetween(pt, near) : null) : s.distance_mi;
+      return { s, usable, full, period, cents, nextGame, dist };
     })
     .filter((r) => r.usable)
     .filter((r) => !q.avail || !r.full);
@@ -99,20 +107,23 @@ export default async function find(view, { store, query, go }) {
   const cmp = {
     price_asc: (a, b) => a.cents - b.cents,
     price_desc: (a, b) => b.cents - a.cents,
-    distance: (a, b) => (a.s.distance_mi ?? 99) - (b.s.distance_mi ?? 99),
+    distance: (a, b) => (a.dist ?? 99) - (b.dist ?? 99),
   }[q.sort] || ((a, b) => a.cents - b.cents);
   results.sort((a, b) => (a.full - b.full) || cmp(a, b));
 
-  view.querySelector('#count').textContent = `Available Spots (${results.filter((r) => !r.full).length})`;
+  view.querySelector('#count').textContent = near
+    ? `Spots near ${near.name} (${results.filter((r) => !r.full).length})`
+    : `Available Spots (${results.filter((r) => !r.full).length})`;
   const list = view.querySelector('#results');
   if (!results.length) {
     list.innerHTML = `<div class="card empty" style="grid-column:1/-1">${icon('search')}<h3>No spots match yet</h3>
-      <p>Try a different date, a longer time window, or clear the area. Spotted is starting around CU Boulder.</p>
+      <p>Try a different date, a longer time window, or clear the building. Spotted is starting around CU Boulder.</p>
       <a class="btn btn-outline btn-sm" href="#/find">Reset search</a></div>`;
     return;
   }
   const link = (r) => {
     const p = new URLSearchParams({ period: r.period, date: r.period === 'event' && r.nextGame ? r.nextGame : q.date });
+    if (near) p.set('near', q.near);
     return `#/spot/${encodeURIComponent(r.s.id)}?${p}`;
   };
   list.innerHTML = results.map((r) => `
@@ -120,7 +131,7 @@ export default async function find(view, { store, query, go }) {
       <img src="${esc(photoOf(r.s))}" alt="" loading="lazy" />
       <div class="body">
         <h3>${esc(r.s.title)}</h3>
-        <div class="dist">${icon('pin')} ${r.s.distance_mi != null ? `${r.s.distance_mi} mi from CU` : esc(r.s.area || r.s.city)}</div>
+        <div class="dist">${icon('pin')} ${r.dist != null ? `${r.dist.toFixed(1)} mi ${near ? `to ${esc(shortName(near))}` : 'from CU'}` : esc(r.s.area || r.s.city)}</div>
         <div class="tags">
           <span class="tag">${icon(r.s.covered ? 'covered' : 'sun')} ${r.s.covered ? 'Covered' : 'Outdoor'}</span>
           <span class="tag">${icon(SPOT_TYPES[r.s.spot_type].icon)} ${SPOT_TYPES[r.s.spot_type].label}</span>
@@ -133,3 +144,6 @@ export default async function find(view, { store, query, go }) {
       </div>
     </a>`).join('');
 }
+
+// "Koelbel Building: Leeds School of Business" -> "Koelbel Building" for tight card space.
+function shortName(b) { return b.name.split(/[:(]/)[0].trim(); }

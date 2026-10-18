@@ -480,3 +480,21 @@ main:focus, main:focus-visible { outline: none; }
   .demo-strip .long { display: none; }
 }
 @media (min-width: 860px) { .demo-strip .short { display: none; } }
+
+/* --------------------------------------------------------- building picker */
+.search-card .label.sm { font-size: .74rem; color: var(--muted); font-weight: 600; }
+.picker { position: relative; }
+.picker input { padding-right: 38px; }
+.picker-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border: 0; background: none; color: var(--muted); border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.picker-clear:hover { background: var(--blue-50); color: var(--ink); }
+.picker-clear .i { width: 16px; height: 16px; }
+.picker-list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px); margin: 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-lg); max-height: 300px; overflow: auto; min-width: 260px; }
+.picker-list li { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: .9rem; color: var(--ink); }
+.picker-list li .i { width: 16px; height: 16px; color: var(--blue); }
+.picker-list li[aria-selected="true"], .picker-list li[role="option"]:hover { background: var(--blue-50); }
+.picker-list mark { background: none; color: var(--blue); font-weight: 700; }
+.picker-name { flex: 1; min-width: 0; }
+.picker-code { font-size: .72rem; font-weight: 700; color: var(--muted); background: #EEF2F8; border-radius: 6px; padding: 2px 6px; }
+.picker-head { font-size: .72rem !important; font-weight: 700; color: var(--muted) !important; text-transform: uppercase; letter-spacing: .08em; cursor: default !important; padding: 6px 10px 4px !important; }
+.picker-head:hover { background: none !important; }
+.picker-empty { color: var(--muted) !important; cursor: default !important; font-size: .86rem !important; }

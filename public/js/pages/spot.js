@@ -1,3 +1,5 @@
+import { buildingByCode, milesBetween } from '../buildings-picker.js';
+import { spotPoint } from '../geo.js';
 import { esc, icon, money, PERIODS, MAX_QTY, SPOT_TYPES, priceCents, todayISO, parseISO, endDateFor, addDaysISO, fmtDay, fmtDate, fmtTime, daysSummary, photoOf, rating, toast, initials, DAY_NAMES } from '../ui.js';
 
 export default async function spot(view, { store, params, query, go, requireAuth, user }) {
@@ -18,10 +20,13 @@ export default async function spot(view, { store, params, query, go, requireAuth
   if (state.period === 'event' && !upcomingGames.includes(state.date)) state.date = upcomingGames[0] || '';
   if (state.period === 'day') state.date = nextOpenDay(state.date);
   const photos = s.photos?.length ? s.photos : [photoOf(s)];
+  const near = buildingByCode(query.near);
+  const pt = spotPoint(s);
+  const nearLine = near && pt ? `<div class="tag" style="margin-top:2px">${icon('car')} About ${milesBetween(pt, near).toFixed(1)} mi to ${esc(near.name)}</div>` : '';
 
   view.innerHTML = `
   <section class="page page-spot">
-    <a class="back" href="#/find">${icon('back')} Back to results</a>
+    <a class="back" href="#/find${query.near ? `?near=${encodeURIComponent(query.near)}` : ''}">${icon('back')} Back to results</a>
     <div class="spot-layout">
       <div>
         <div class="gallery">
@@ -33,6 +38,7 @@ export default async function spot(view, { store, params, query, go, requireAuth
           <div>
             <h1>${esc(s.title)}</h1>
             <div class="tag">${icon('pin')} ${s.distance_mi != null ? `${s.distance_mi} mi from CU · ` : ''}${esc(s.area ? `${s.area}, ${s.city}` : s.city)}</div>
+            ${nearLine}
           </div>
           ${rating(s)}
         </div>

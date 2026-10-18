@@ -11,7 +11,7 @@ Until Supabase is connected, the site runs in **demo mode**: everything works, b
 
 ## How booking and payment work
 
-1. A commuter searches by city, area, date, time and length, then books a spot.
+1. A commuter searches by city, the CU building they want to park near, date, time and length, then books a spot. Picking a building sorts spots by distance to it.
 2. The payment page shows a QR code that opens the host's Venmo with the amount and a booking code (like `SP-AF5D67`) filled in. The commuter pays, then taps **I've sent the payment**.
 3. The host checks Venmo and taps **Payment received** on their dashboard.
 4. The commuter now sees the street address. Addresses stay hidden until then.
@@ -32,6 +32,7 @@ The database refuses double bookings, days the host doesn't offer, and dates tha
 2. Open **SQL Editor**, then paste and run each file in order:
    - `supabase/migrations/20261018000001_spotted.sql` (tables, security rules, booking logic)
    - `supabase/migrations/20261018000002_spot_photos.sql` (photo storage)
+   - `supabase/migrations/20261018000003_spot_locations.sql` (map location of each spot)
 3. **Authentication → URL Configuration:** set the Site URL to your Netlify URL.
 4. Optional, for easier testing: **Authentication → Sign In / Providers → Email**, turn off **Confirm email**. Leave it on for real launch.
 5. **Project Settings → API:** copy the Project URL and the publishable (anon) key.
@@ -58,6 +59,7 @@ Sample spots are labeled "Sample listing". Bookings on them go to the team accou
 | Colors, fonts, layout | `public/css/styles.css` (colors at the top) |
 | Sample spots | `public/js/samples.js`, then `npm run seed` to regenerate the SQL |
 | Suggested-price formula | `public/js/pricing.js` |
+| CU building list for search | `public/js/buildings.js` (locations from OpenStreetMap) |
 | Hero and spot illustrations | `public/assets/` (swap in real photos, e.g. `hero.jpg`, and update `styles.css`) |
 
 Preview locally from the repo root with `npx serve public` or `python3 -m http.server -d public`, then open the printed address.

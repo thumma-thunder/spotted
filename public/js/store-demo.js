@@ -28,6 +28,10 @@ let db;
 function load() {
   try { db = JSON.parse(localStorage.getItem(KEY)); } catch { db = null; }
   if (!db || !db.spots) db = seed();
+  // Older demo data predates spot locations: fill them in from the samples.
+  db.spots.forEach((s) => {
+    if (s.is_sample && s.lat == null) { const src = SAMPLE_SPOTS.find((x) => `sample-${x.key}` === s.id); if (src) { s.lat = src.lat; s.lng = src.lng; } }
+  });
   // Keep sample game days in the future.
   const sats = nextSaturdays();
   db.spots.forEach((s) => { if (s.is_sample && s.event_dates.length && s.event_dates.every((d) => d < todayISO())) s.event_dates = sats; });

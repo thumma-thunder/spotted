@@ -1,5 +1,6 @@
 import { esc, icon, money, PERIODS, SPOT_TYPES, DAY_NAMES, daysSummary, fmtTime, fmtDate, todayISO, toast } from '../ui.js';
 import { BOULDER_AREAS } from '../samples.js';
+import { geocode, spotPoint, milesToCampus } from '../geo.js';
 import { suggestPrice, comparablePrices, priceVerdict } from '../pricing.js';
 
 const STEPS = ['Spot Details', 'Pricing & Availability', 'Payment Info', 'Review'];
@@ -58,7 +59,7 @@ export default async function list(view, ctx) {
         </div>
         <div class="grid-2">
           <label class="field"><span>Listing name</span><input id="title" value="${esc(S.title)}" maxlength="80" placeholder="North Campus Driveway" /></label>
-          <label class="field"><span>Distance to campus (mi)</span><input id="distance" type="number" inputmode="decimal" min="0" max="30" step="0.1" value="${esc(S.distance)}" placeholder="0.5" /></label>
+          <label class="field"><span>Distance to campus (mi, optional)</span><input id="distance" type="number" inputmode="decimal" min="0" max="30" step="0.1" value="${esc(S.distance)}" placeholder="0.5" /></label>
         </div>
         <div class="field"><span>Spot Type</span>
           <div class="type-grid">${Object.entries(SPOT_TYPES).map(([k, t]) => `<button type="button" class="type-opt" data-type="${k}" aria-pressed="${S.spot_type === k}">${icon(t.icon)}${t.label}</button>`).join('')}</div>
@@ -262,9 +263,15 @@ export default async function list(view, ctx) {
       if (!u) { btn.disabled = false; btn.textContent = 'Publish spot'; return; }
       if (u.venmo_username !== S.venmo) await store.updateProfile({ venmo_username: S.venmo });
       const has = (p) => S.options.includes(p);
+      // Place the spot on the map so commuters can sort by distance to their building.
+      let pt = await geocode(S.address.trim(), S.city.trim());
+      if (pt && milesToCampus(pt) > 40) pt = null;
+      pt = pt || spotPoint({ area: S.area.trim() });
+      const distance = S.distance !== '' ? Math.round(Number(S.distance) * 10) / 10 : pt ? Math.round(milesToCampus(pt) * 10) / 10 : null;
       await store.createSpot({
+        lat: pt?.lat ?? null, lng: pt?.lng ?? null,
         title: S.title.trim(), description: S.description.trim(), city: S.city.trim(), area: S.area.trim(),
-        distance_mi: S.distance === '' ? null : Math.round(Number(S.distance) * 10) / 10,
+        distance_mi: distance,
         spot_type: S.spot_type, covered: S.covered, spot_count: S.spot_count, rent_options: S.options,
         price_day_cents: has('day') ? S.prices.day : null, price_week_cents: has('week') ? S.prices.week : null,
         price_month_cents: has('month') ? S.prices.month : null, price_event_cents: has('event') ? S.prices.event : null,

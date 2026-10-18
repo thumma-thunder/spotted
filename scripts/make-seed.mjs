@@ -14,10 +14,10 @@ const rows = SAMPLE_SPOTS.map((s) => {
   return `
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
   values (v_owner, ${q(s.title)}, ${q(s.description)}, ${q(s.city)}, ${q(s.area)}, ${n(s.distance_mi)}, ${q(s.spot_type)}, ${s.covered}, ${s.spot_count},
     ${arr(s.rent_options, 'text')}, ${n(s.price_day_cents)}, ${n(s.price_week_cents)}, ${n(s.price_month_cents)}, ${n(s.price_event_cents)}, ${arr(s.avail_days, 'smallint')},
-    ${q(s.start_time)}, ${q(s.end_time)}, ${q(s.event_label || '')}, ${events}, ${arr(s.photos, 'text')}, ${n(s.rating)}, ${s.review_count}, true)
+    ${q(s.start_time)}, ${q(s.end_time)}, ${q(s.event_label || '')}, ${events}, ${arr(s.photos, 'text')}, ${n(s.rating)}, ${s.review_count}, true, ${n(s.lat)}, ${n(s.lng)})
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, ${q(s.address)});`;
 }).join('\n');

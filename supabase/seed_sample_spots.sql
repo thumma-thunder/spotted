@@ -21,73 +21,73 @@ begin
 
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
-  values (v_owner, 'North Campus Driveway', 'Wide driveway on a quiet street, a short walk to Norlin Quad. Pull all the way up to the garage door.', 'Boulder', 'University Hill', 0.3, 'driveway', false, 1,
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
+  values (v_owner, 'North Campus Driveway', 'Wide driveway on a quiet street, a short walk to Norlin Quad. Pull all the way up to the garage door.', 'Boulder', 'University Hill', 0.4, 'driveway', false, 1,
     array['day','week']::text[], 800, 3500, null, null, array[1,2,3,4,5]::smallint[],
-    '07:00', '18:00', '', '{}'::date[], array['assets/spots/driveway-1.svg']::text[], 4.9, 23, true)
+    '07:00', '18:00', '', '{}'::date[], array['assets/spots/driveway-1.svg']::text[], 4.9, 23, true, 40.0063, -105.2775)
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, '1234 Example St, Boulder, CO');
 
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
-  values (v_owner, 'East Boulder Garage', 'Covered single-car garage. Keeps your car out of the snow. Door code is shared after booking.', 'Boulder', 'Goss-Grove', 0.6, 'garage', true, 1,
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
+  values (v_owner, 'East Boulder Garage', 'Covered single-car garage. Keeps your car out of the snow. Door code is shared after booking.', 'Boulder', 'Goss-Grove', 0.5, 'garage', true, 1,
     array['day','week','month']::text[], 1200, 5500, 18000, null, array[0,1,2,3,4,5,6]::smallint[],
-    '06:00', '22:00', '', '{}'::date[], array['assets/spots/garage-1.svg']::text[], 4.7, 17, true)
+    '06:00', '22:00', '', '{}'::date[], array['assets/spots/garage-1.svg']::text[], 4.7, 17, true, 40.013, -105.262)
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, '2280 Sample Ave, Boulder, CO');
 
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
-  values (v_owner, 'University Hill Spot', 'Off-street spot behind the house, under a big maple. Enter from the alley.', 'Boulder', 'University Hill', 0.8, 'driveway', false, 1,
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
+  values (v_owner, 'University Hill Spot', 'Off-street spot behind the house, under a big maple. Enter from the alley.', 'Boulder', 'University Hill', 0.6, 'driveway', false, 1,
     array['day','month']::text[], 1000, null, 15000, null, array[1,2,3,4,5]::smallint[],
-    '07:30', '17:30', '', '{}'::date[], array['assets/spots/driveway-2.svg']::text[], 4.8, 29, true)
+    '07:30', '17:30', '', '{}'::date[], array['assets/spots/driveway-2.svg']::text[], 4.8, 29, true, 40.0035, -105.2795)
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, '955 Placeholder Pl, Boulder, CO');
 
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
-  values (v_owner, 'CU Football Game Parking', 'Park and walk to Folsom Field on home game days. Tailgate-friendly front lawn.', 'Boulder', 'Martin Acres', 1.1, 'driveway', false, 3,
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
+  values (v_owner, 'CU Football Game Parking', 'Park and walk to Folsom Field on home game days. Tailgate-friendly front lawn.', 'Boulder', 'Martin Acres', 1.3, 'driveway', false, 3,
     array['event']::text[], null, null, null, 2500, array[6]::smallint[],
-    '08:00', '22:00', 'CU home game', array[v_sat, v_sat + 14, v_sat + 28], array['assets/spots/driveway-3.svg']::text[], 4.9, 48, true)
+    '08:00', '22:00', 'CU home game', array[v_sat, v_sat + 14, v_sat + 28], array['assets/spots/driveway-3.svg']::text[], 4.9, 48, true, 39.9945, -105.2545)
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, '1701 Demo Dr, Boulder, CO');
 
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
-  values (v_owner, 'Goss-Grove Small Lot', 'Two spaces in a small private lot next to a duplex. Easy in, easy out for early classes.', 'Boulder', 'Goss-Grove', 0.5, 'lot', false, 2,
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
+  values (v_owner, 'Goss-Grove Small Lot', 'Two spaces in a small private lot next to a duplex. Easy in, easy out for early classes.', 'Boulder', 'Goss-Grove', 0.3, 'lot', false, 2,
     array['day','week','month']::text[], 900, 4000, 14000, null, array[1,2,3,4,5]::smallint[],
-    '07:00', '19:00', '', '{}'::date[], array['assets/spots/lot-1.svg']::text[], 4.6, 12, true)
+    '07:00', '19:00', '', '{}'::date[], array['assets/spots/lot-1.svg']::text[], 4.6, 12, true, 40.0125, -105.2665)
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, '1420 Test Ct, Boulder, CO');
 
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
-  values (v_owner, 'Martin Acres Driveway', 'Budget option on the bus line. About a 20 minute walk or a quick ride on the SKIP.', 'Boulder', 'Martin Acres', 1.4, 'driveway', false, 1,
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
+  values (v_owner, 'Martin Acres Driveway', 'Budget option on the bus line. About a 20 minute walk or a quick ride on the SKIP.', 'Boulder', 'Martin Acres', 1.5, 'driveway', false, 1,
     array['day','week','month']::text[], 600, 2500, 8000, null, array[1,2,3,4,5]::smallint[],
-    '06:30', '18:30', '', '{}'::date[], array['assets/spots/driveway-4.svg']::text[], 4.5, 9, true)
+    '06:30', '18:30', '', '{}'::date[], array['assets/spots/driveway-4.svg']::text[], 4.5, 9, true, 39.9905, -105.256)
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, '3310 Mock Ln, Boulder, CO');
 
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
-  values (v_owner, 'Baseline Covered Carport', 'Carport space near Baseline and Broadway. Covered from hail and snow.', 'Boulder', 'Chautauqua', 0.9, 'other', true, 1,
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
+  values (v_owner, 'Baseline Covered Carport', 'Carport space near Baseline and Broadway. Covered from hail and snow.', 'Boulder', 'Chautauqua', 0.8, 'other', true, 1,
     array['day','week']::text[], 1100, 5000, null, null, array[1,2,3,4,5,6]::smallint[],
-    '07:00', '20:00', '', '{}'::date[], array['assets/spots/garage-2.svg']::text[], 4.8, 14, true)
+    '07:00', '20:00', '', '{}'::date[], array['assets/spots/garage-2.svg']::text[], 4.8, 14, true, 39.9995, -105.2785)
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, '780 Sample Rd, Boulder, CO');
 
   insert into public.spots (owner_id, title, description, city, area, distance_mi, spot_type, covered, spot_count,
     rent_options, price_day_cents, price_week_cents, price_month_cents, price_event_cents, avail_days,
-    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample)
-  values (v_owner, 'Williams Village Driveway', 'Driveway close to Williams Village and the Buff Bus stop. Great for monthly commuters.', 'Boulder', 'Williams Village', 1.2, 'driveway', false, 1,
+    start_time, end_time, event_label, event_dates, photos, rating, review_count, is_sample, lat, lng)
+  values (v_owner, 'Williams Village Driveway', 'Driveway close to Williams Village and the Buff Bus stop. Great for monthly commuters.', 'Boulder', 'Williams Village', 1.7, 'driveway', false, 1,
     array['week','month']::text[], null, 3000, 11000, null, array[0,1,2,3,4,5,6]::smallint[],
-    '06:00', '21:00', '', '{}'::date[], array['assets/spots/driveway-5.svg']::text[], 4.7, 21, true)
+    '06:00', '21:00', '', '{}'::date[], array['assets/spots/driveway-5.svg']::text[], 4.7, 21, true, 39.996, -105.244)
   returning id into v_spot;
   insert into public.spot_addresses (spot_id, street_address) values (v_spot, '505 Example Way, Boulder, CO');
 end $$;
