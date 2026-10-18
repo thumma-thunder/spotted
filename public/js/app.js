@@ -71,7 +71,7 @@ function authDialog(reason, onDone, startMode = 'signin') {
     </div>
     <form class="form" id="auth-form" novalidate>
       <label class="field" data-only="signup"><span>Full name</span><input name="name" autocomplete="name" placeholder="Kendra Nelson" /></label>
-      <label class="field"><span>Email</span><input name="email" type="email" autocomplete="email" required placeholder="you@colorado.edu" /></label>
+      <label class="field"><span>Email</span><input name="email" type="email" autocomplete="email" required placeholder="you@email.com" /></label>
       <label class="field"><span>Password</span><input name="password" type="password" minlength="6" required autocomplete="current-password" placeholder="At least 6 characters" /></label>
       <p class="form-error" role="alert" hidden></p>
       <button class="btn btn-primary btn-block" type="submit"></button>
