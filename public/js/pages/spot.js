@@ -61,7 +61,7 @@ export default async function spot(view, { store, params, query, go, requireAuth
 
         <div class="card card-pad host-row" style="margin-top:12px">
           <span class="avatar">${esc(initials(s.host?.full_name))}</span>
-          <div class="spacer"><strong style="color:var(--ink)">${esc(s.host?.full_name || 'Spotted host')}</strong><div class="muted" style="font-size:.82rem">Spot owner · Paid via Venmo</div></div>
+          <div class="spacer"><strong style="color:var(--ink)">${esc(s.host?.full_name || 'Spotted host')}</strong><div class="muted" style="font-size:.82rem">Spot owner</div></div>
           ${isOwner ? '' : `<button class="btn btn-ghost btn-sm" id="msg">${icon('chat')} Message</button>`}
         </div>
       </div>
@@ -74,7 +74,7 @@ export default async function spot(view, { store, params, query, go, requireAuth
         <div class="total-row"><span class="muted" id="total-label"></span><strong id="total"></strong></div>
         <p class="form-error" id="book-err" role="alert" hidden></p>
         <button class="btn btn-primary btn-block btn-lg" id="book-btn" style="margin-top:14px">Book Now</button>
-        <p class="fine">${icon('info')} You'll pay the host directly with Venmo. The exact address is shared once they confirm your payment.</p>`}
+        <p class="fine">${icon('info')} You'll pay Spotted with Venmo. The exact address is shared once your payment is confirmed.</p>`}
       </aside>
     </div>
   </section>

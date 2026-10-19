@@ -6,7 +6,7 @@ export default async function account(view, { store, requireAuth, rerender, go }
   const demoInfo = store.mode === 'demo' ? `
     <div class="card card-pad">
       <h3>Demo mode</h3>
-      <p class="muted" style="font-size:.9rem">This copy of Spotted isn't connected to a database yet, so accounts, listings, bookings and messages are saved only in this browser. The sample host confirms payments and replies to messages on its own so you can try the whole flow. Venmo QR codes here don't send money anywhere.</p>
+      <p class="muted" style="font-size:.9rem">This copy of Spotted isn't connected to a database yet, so accounts, listings, bookings and messages are saved only in this browser. Sample bookings confirm on their own and the sample host replies to messages so you can try the whole flow. Venmo QR codes here don't send money anywhere. Sign up as spottedparking@outlook.com to see the Spotted team page.</p>
       <button class="btn btn-ghost btn-sm" id="reset">Reset demo data</button>
     </div>` : '';
   if (!u) {
@@ -20,7 +20,7 @@ export default async function account(view, { store, requireAuth, rerender, go }
         <div class="card card-pad">
           <form class="form" id="pf">
             <label class="field"><span>Name</span><input name="full_name" value="${esc(u.full_name)}" maxlength="80" autocomplete="name" /></label>
-            <div class="field"><span>Venmo (for getting paid as a host)</span>
+            <div class="field"><span>Venmo (where Spotted pays you as a host)</span>
               <div class="row"><b style="color:var(--ink)">${u.venmo_username ? `@${esc(u.venmo_username)}` : '<span class="muted">Not added</span>'}</b><span class="spacer"></span><button type="button" class="btn btn-ghost btn-xs" id="venmo">${u.venmo_username ? 'Edit' : 'Add'}</button></div></div>
             <button class="btn btn-primary">Save</button>
           </form>
@@ -28,6 +28,7 @@ export default async function account(view, { store, requireAuth, rerender, go }
         <div class="card card-pad row" style="flex-wrap:wrap">
           <a class="btn btn-ghost btn-sm" href="#/bookings">${icon('calendar')} My bookings</a>
           <a class="btn btn-ghost btn-sm" href="#/host">${icon('list')} Host dashboard</a>
+          ${u.is_admin ? `<a class="btn btn-ghost btn-sm" href="#/team">${icon('shield')} Spotted team</a>` : ''}
           <span class="spacer"></span>
           <button class="btn btn-outline btn-sm" id="so">Sign out</button>
         </div>

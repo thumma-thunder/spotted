@@ -23,9 +23,13 @@ export async function createLiveStore({ supabaseUrl, supabaseKey }) {
 
   async function loadProfile(sessionUser) {
     if (!sessionUser) { user = null; return; }
-    const { data } = await sb.from('profiles').select('id, full_name, venmo_username').eq('id', sessionUser.id).maybeSingle();
-    user = { id: sessionUser.id, email: sessionUser.email, full_name: data?.full_name || sessionUser.email, venmo_username: data?.venmo_username || null };
+    const [{ data }, { data: admin }] = await Promise.all([
+      sb.from('profiles').select('id, full_name, venmo_username').eq('id', sessionUser.id).maybeSingle(),
+      sb.rpc('is_admin'),
+    ]);
+    user = { id: sessionUser.id, email: sessionUser.email, full_name: data?.full_name || sessionUser.email, venmo_username: data?.venmo_username || null, is_admin: !!admin };
   }
+  let settings = null;
 
   const { data: { session } } = await sb.auth.getSession();
   await loadProfile(session?.user);
@@ -55,6 +59,13 @@ export async function createLiveStore({ supabaseUrl, supabaseKey }) {
     mode: 'live',
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     async getUser() { return user; },
+    async getSettings() {
+      if (!settings) {
+        const row = await run(sb.from('platform_settings').select('venmo_username, fee_bps').maybeSingle());
+        settings = row || { venmo_username: 'david-thumma', fee_bps: 800 };
+      }
+      return settings;
+    },
 
     async signUp({ name, email, password }) {
       const data = await run(sb.auth.signUp({
@@ -90,7 +101,7 @@ export async function createLiveStore({ supabaseUrl, supabaseKey }) {
 
     async createSpot(data, address, photoFiles = []) {
       const u = requireUser();
-      if (!u.venmo_username) throw new Error('Add your Venmo username so commuters can pay you.');
+      if (!u.venmo_username) throw new Error('Add your Venmo username so Spotted can pay you.');
       const photos = [];
       for (const f of photoFiles.slice(0, 5)) {
         const dataUrl = await shrinkToDataUrl(f, 1280);
@@ -122,6 +133,11 @@ export async function createLiveStore({ supabaseUrl, supabaseKey }) {
     async hostBookings() { const u = requireUser(); return withAddresses(await run(sb.from('bookings').select(BOOKING).eq('owner_id', u.id).order('created_at', { ascending: false }))); },
     async markPaymentSent(id) { await run(sb.rpc('mark_payment_sent', { p_booking_id: id })); emit(); },
     async confirmPayment(id) { await run(sb.rpc('confirm_payment', { p_booking_id: id })); emit(); },
+    async markPaidOut(id) { await run(sb.rpc('mark_paid_out', { p_booking_id: id })); emit(); },
+    async allBookings() {
+      if (!user?.is_admin) throw new Error('Only the Spotted team can see this page.');
+      return run(sb.from('bookings').select(BOOKING).order('created_at', { ascending: false }).limit(500));
+    },
     async cancelBooking(id) { await run(sb.rpc('cancel_booking', { p_booking_id: id })); emit(); },
 
     async openConversation(spotId, renterId = null) {

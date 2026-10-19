@@ -25,7 +25,7 @@ export default function home(view) {
       <h2>How It Works</h2>
       <div class="steps">
         <div class="step"><div class="num">1</div><h3>Find a Spot</h3><p>Search available parking near campus.</p></div>
-        <div class="step"><div class="num">2</div><h3>Book &amp; Pay</h3><p>Reserve online and pay the host with Venmo.</p></div>
+        <div class="step"><div class="num">2</div><h3>Book &amp; Pay</h3><p>Reserve online and pay with Venmo.</p></div>
         <div class="step"><div class="num">3</div><h3>Park &amp; Go</h3><p>Show up, park and walk to class.</p></div>
       </div>
     </div>
@@ -41,7 +41,7 @@ export default function home(view) {
     <div class="card">
       <span class="eyebrow">Homeowners</span>
       <h3>Your driveway. Their spot.</h3>
-      <p>Turn space that sits empty during class hours into extra income, paid straight to your Venmo.</p>
+      <p>Turn space that sits empty during class hours into extra income, paid out to your Venmo.</p>
       <a class="btn btn-outline btn-sm" href="#/list">List your spot</a>
     </div>
   </section>`;

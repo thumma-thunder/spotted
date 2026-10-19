@@ -498,3 +498,22 @@ main:focus, main:focus-visible { outline: none; }
 .picker-head { font-size: .72rem !important; font-weight: 700; color: var(--muted) !important; text-transform: uppercase; letter-spacing: .08em; cursor: default !important; padding: 6px 10px 4px !important; }
 .picker-head:hover { background: none !important; }
 .picker-empty { color: var(--muted) !important; cursor: default !important; font-size: .86rem !important; }
+
+/* ---------------------------------------------------------- payouts / team */
+.payout-stats { display: flex; gap: 4px 18px; margin-top: 6px; font-size: .82rem; color: var(--muted); flex-wrap: wrap; }
+.payout-stats b { color: var(--ink); }
+.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 760px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
+.stat { padding: 14px 16px; display: grid; gap: 2px; }
+.stat span { font-size: .78rem; color: var(--muted); font-weight: 600; }
+.stat b { font-size: 1.3rem; color: var(--ink); }
+.ref-chip { width: 76px; height: 64px; border-radius: 10px; background: var(--blue-50); color: var(--blue-600); font-weight: 800; font-size: .78rem; display: grid; place-items: center; text-align: center; }
+@media (min-width: 700px) { .ref-chip { width: 96px; height: 72px; font-size: .85rem; } }
+.payout-lines { margin-top: 10px; border-top: 1px solid var(--line); }
+.payout-line { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: .84rem; color: var(--text); }
+.payout-line:last-child { border-bottom: 0; }
+.payout-owner .meta { font-size: .84rem; color: var(--muted); }
+.qr-inline { display: grid; justify-items: center; margin-top: 10px; }
+.history { max-height: 420px; overflow: auto; padding-top: 6px; padding-bottom: 6px; }
+.team-link { display: none; }
+@media (min-width: 860px) { .team-link { display: inline-flex; } }

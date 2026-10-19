@@ -16,7 +16,9 @@ export default async function list(view, ctx) {
   const user = await store.getUser();
   if (user && !S.venmo) S.venmo = user.venmo_username || '';
   const maxPhotos = store.mode === 'demo' ? 3 : 5;
-  const allSpots = await store.listSpots();
+  const [allSpots, settings] = await Promise.all([store.listSpots(), store.getSettings()]);
+  const feePct = settings.fee_bps / 100;
+  const net = (cents) => cents - Math.round(cents * settings.fee_bps / 10000);
 
   const priceInfo = (period) => suggestPrice({
     period, distance_mi: S.distance === '' ? null : Number(S.distance), spot_type: S.spot_type, covered: S.covered,
@@ -51,7 +53,7 @@ export default async function list(view, ctx) {
       <h2>1. Spot Details</h2><p class="lead">Tell us about your parking space.</p>
       <div class="form">
         <label class="field"><span>Address</span><input id="address" value="${esc(S.address)}" placeholder="1234 Example St, Boulder, CO" autocomplete="street-address" />
-          <small>Only shown to renters after you confirm their payment.</small></label>
+          <small>Only shown to a commuter once their payment is confirmed.</small></label>
         <div class="grid-2">
           <label class="field"><span>City</span><input id="city" value="${esc(S.city)}" autocomplete="address-level2" /></label>
           <label class="field"><span>Neighborhood</span><input id="area" list="areas" value="${esc(S.area)}" placeholder="University Hill" />
@@ -146,6 +148,7 @@ export default async function list(view, ctx) {
         </div>
         <div class="slider-scale"><span>${money(info.min)}</span><span>${money(info.max)}</span></div>
         <div class="verdict ${verdict.tone}" data-verdict="${p}">${verdict.text}</div>
+        <div class="hint" data-net="${p}">You earn <b>${money(net(v), { decimals: 2 })}</b>${PERIODS[p].short} after Spotted's ${feePct}% fee</div>
         ${info.range ? `<div class="hint" style="margin-top:4px">Similar spots in ${esc(S.city)}: ${money(info.range[0])}–${money(info.range[1])}${PERIODS[p].short}</div>` : ''}
       </div>`;
     }).join('');
@@ -180,6 +183,7 @@ export default async function list(view, ctx) {
       slider.style.setProperty('--fill', `${Math.max(0, Math.min(100, ((cents - info.min) / (info.max - info.min)) * 100))}%`);
       const v = priceVerdict(cents, info.suggested);
       const el = blk.querySelector('[data-verdict]'); el.textContent = v.text; el.className = `verdict ${v.tone}`;
+      blk.querySelector('[data-net]').innerHTML = `You earn <b>${money(net(cents), { decimals: 2 })}</b>${PERIODS[p].short} after Spotted's ${feePct}% fee`;
     };
     view.querySelectorAll('[data-slider]').forEach((s) => s.addEventListener('input', () => setPrice(s.dataset.slider, Number(s.value), 'slider')));
     view.querySelectorAll('[data-price]').forEach((f) => f.addEventListener('input', () => { const d = Number(f.value); if (d >= 1) setPrice(f.dataset.price, Math.round(d * 100), 'input'); }));
@@ -207,17 +211,17 @@ export default async function list(view, ctx) {
   async function step3() {
     const u = await store.getUser();
     shell(`
-      <h2>3. Payment Info</h2><p class="lead">Commuters pay you directly on Venmo. Spotted never holds your money.</p>
+      <h2>3. Payment Info</h2><p class="lead">Commuters pay Spotted, and Spotted sends your earnings to your Venmo.</p>
       ${u ? `<div class="notice" style="margin-bottom:16px">${icon('user')}<div><strong>Listing as ${esc(u.full_name)}</strong><p>${esc(u.email)}</p></div></div>`
         : `<div class="notice" style="margin-bottom:16px">${icon('user')}<div><strong>Sign in to publish</strong><p>Create a free account so you can manage bookings and chat with commuters.</p><button type="button" class="btn btn-primary btn-sm" id="si" style="margin-top:8px">Sign in or create account</button></div></div>`}
       <div class="form">
         <label class="field"><span>Your Venmo username</span>
           <div class="prefix"><b>@</b><input id="venmo" value="${esc(S.venmo)}" placeholder="Alex-Rivera" autocomplete="off" /></div>
-          <small>Renters see a QR code for this account with the exact amount and a booking code in the note.</small></label>
+          <small>This is where Spotted sends your payouts. Commuters never see it.</small></label>
         <ol class="pay-steps" style="margin-top:6px">
-          <li><span>A commuter books and pays your Venmo.</span></li>
-          <li><span>You check Venmo for the amount and booking code, then tap <b>Payment received</b> on your dashboard.</span></li>
-          <li><span>They get your address and park. Chat any time from Messages.</span></li>
+          <li><span>A commuter books your spot and pays Spotted on Venmo.</span></li>
+          <li><span>Spotted confirms the payment and sends the commuter your address.</span></li>
+          <li><span>Spotted pays you ${100 - feePct}% of the booking on Venmo, usually within 2–3 days. Spotted keeps ${feePct}%.</span></li>
         </ol>
       </div>`);
     view.querySelector('#venmo').addEventListener('input', (e) => { S.venmo = e.target.value.replace(/^@/, '').trim(); });
@@ -245,10 +249,11 @@ export default async function list(view, ctx) {
         ${S.distance !== '' ? row('Distance', `${esc(S.distance)} mi from CU`) : ''}
         ${row('Type', `${SPOT_TYPES[S.spot_type].label}${S.covered ? ', covered' : ''} · ${S.spot_count} space${S.spot_count > 1 ? 's' : ''}`)}
         ${row('Pricing', S.options.map((p) => `${money(S.prices[p])}${PERIODS[p].short}`).join(' · '))}
+        ${row('You earn', S.options.map((p) => `${money(net(S.prices[p]), { decimals: 2 })}${PERIODS[p].short}`).join(' · ') + ` (after ${feePct}% fee)`)}
         ${row('Available', `${esc(daysSummary(S.days))}, ${fmtTime(S.start)}–${fmtTime(S.end)}`)}
         ${S.options.includes('event') ? row(esc(S.event_label || 'Events'), S.event_dates.map((d) => fmtDate(d, { month: 'short', day: 'numeric' })).join(', ')) : ''}
         ${row('Photos', S.files.length ? `${S.files.length}` : 'None (we\'ll use an illustration)')}
-        ${row('Paid to', `@${esc(S.venmo)} on Venmo`)}
+        ${row('Payouts to', `@${esc(S.venmo)} on Venmo`)}
       </div>`);
   }
 

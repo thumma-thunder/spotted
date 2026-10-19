@@ -13,6 +13,7 @@ const routes = [
   [/^\/list$/, () => import('./pages/list.js')],
   [/^\/account$/, () => import('./pages/account.js')],
   [/^\/demo-qr$/, () => import('./pages/demo-qr.js')],
+  [/^\/team$/, () => import('./pages/admin.js')],
 ];
 
 let store;
@@ -125,7 +126,8 @@ async function renderChrome() {
   const user = await store.getUser();
   const actions = document.getElementById('topbar-actions');
   actions.innerHTML = user
-    ? `<a class="icon-btn" href="#/messages" aria-label="Messages">${icon('chat')}</a>
+    ? `${user.is_admin ? '<a class="btn btn-ghost btn-xs team-link" href="#/team">Team</a>' : ''}
+       <a class="icon-btn" href="#/messages" aria-label="Messages">${icon('chat')}</a>
        <a class="avatar" href="#/account" aria-label="Your account" title="${esc(user.full_name)}">${esc(initials(user.full_name))}</a>`
     : `<button class="link-btn" type="button" data-signin>Sign in</button>
        <button class="btn btn-primary btn-sm" type="button" data-signup>Get Started</button>`;
@@ -146,7 +148,7 @@ function markNav(path) {
     : path.startsWith('/bookings') || path.startsWith('/pay') ? 'bookings'
     : path.startsWith('/messages') ? 'messages'
     : path.startsWith('/host') || path.startsWith('/list') ? 'host'
-    : path.startsWith('/account') ? 'account' : '';
+    : path.startsWith('/account') ? 'account' : path.startsWith('/team') ? 'team' : '';
   document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === key));
   document.querySelectorAll('[data-tab]').forEach((a) => {
     const on = a.dataset.tab === key;

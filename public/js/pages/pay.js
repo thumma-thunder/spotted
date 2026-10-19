@@ -13,7 +13,8 @@ export default async function pay(view, { store, params, go, requireAuth }) {
   }
   if (b.owner_id === u.id && b.renter_id !== u.id) { go('/host'); return; }
 
-  const venmo = b.host?.venmo_username;
+  const settings = await store.getSettings();
+  const venmo = settings.venmo_username;
   const note = `Spotted parking ${b.ref_code}`;
   const demo = store.mode === 'demo';
   const payUrl = venmo ? venmoLink(venmo, b.total_cents, note) : null;
@@ -36,7 +37,7 @@ export default async function pay(view, { store, params, go, requireAuth }) {
       </div>
       <div class="row" style="margin-top:14px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" id="msg">${icon('chat')} Message ${esc(b.host?.full_name?.split(' ')[0] || 'host')}</button>
-        ${b.status !== 'cancelled' ? '<button class="btn-danger-text" id="cancel">Cancel booking</button>' : ''}
+        ${b.status === 'awaiting_payment' ? '<button class="btn-danger-text" id="cancel">Cancel booking</button>' : ''}
       </div>
     </div>`;
 
@@ -45,33 +46,34 @@ export default async function pay(view, { store, params, go, requireAuth }) {
     right = venmo ? `
       <div class="card card-pad qr-box">
         <span class="venmo-badge">venmo</span>
-        <h2 style="margin:0">Pay ${money(b.total_cents, { decimals: 2 })} to @${esc(venmo)}</h2>
-        ${demo ? `<div class="notice notice-warn" style="text-align:left">${icon('info')}<div><strong>Demo mode: don't send money</strong><p>This QR opens a page explaining the demo. On the live site it opens the host's Venmo with the amount filled in.</p></div></div>` : ''}
+        <h2 style="margin:0">Pay ${money(b.total_cents, { decimals: 2 })} to Spotted</h2>
+        <p class="muted" style="margin:-6px 0 0">Venmo <b style="color:var(--ink)">@${esc(venmo)}</b></p>
+        ${demo ? `<div class="notice notice-warn" style="text-align:left">${icon('info')}<div><strong>Demo mode: don't send money</strong><p>This QR opens a page explaining the demo. On the live site it opens Spotted's Venmo with the amount filled in.</p></div></div>` : ''}
         <div class="qr" aria-label="Venmo QR code">${qrSvg(qrTarget)}</div>
         <ol class="pay-steps">
           <li><span><b>Scan with your phone camera</b>${demo ? '' : ' or tap Open Venmo on your phone'}.</span></li>
           <li><span>Check that it's <b>@${esc(venmo)}</b> for <b>${money(b.total_cents, { decimals: 2 })}</b> with the note <b>${esc(b.ref_code)}</b>.</span></li>
-          <li><span>After you pay, tap <b>I've sent the payment</b> below so the host can confirm.</span></li>
+          <li><span>After you pay, tap <b>I've sent the payment</b> below. The Spotted team confirms it and sends you the address.</span></li>
         </ol>
         <div class="copy-row" style="width:100%"><span class="muted" style="font-size:.84rem">Note</span><b style="font-size:.88rem">${esc(note)}</b><button class="btn btn-ghost btn-xs" id="copy">Copy</button></div>
         ${demo ? '' : `<a class="btn btn-outline btn-block" href="${esc(payUrl)}" target="_blank" rel="noopener">${icon('phone')} Open Venmo</a>`}
         <button class="btn btn-primary btn-block btn-lg" id="paid">I've sent the payment</button>
-        <p class="fine" style="margin:0">Spotted doesn't process or hold payments. Payment goes straight to the host on Venmo.</p>
+        <p class="fine" style="margin:0">Spotted collects your payment and pays the spot owner. Message the team any time if something's wrong.</p>
       </div>`
-      : `<div class="card card-pad"><div class="notice notice-warn">${icon('info')}<div><strong>The host hasn't added a Venmo username yet</strong><p>Send them a message to sort out payment.</p></div></div></div>`;
+      : '';
   } else if (b.status === 'payment_sent') {
     right = `<div class="card card-pad stack">
-      <div class="notice">${icon('clock')}<div><strong>Waiting for ${esc(b.host?.full_name || 'the host')} to confirm</strong><p>They'll check Venmo for ${money(b.total_cents, { decimals: 2 })} with note ${esc(b.ref_code)}. You'll see the address here once it's confirmed.</p></div></div>
-      ${demo && b.spot?.is_sample ? '<p class="fine">Demo: the sample host confirms automatically in a few seconds.</p>' : ''}
+      <div class="notice">${icon('clock')}<div><strong>Waiting for Spotted to confirm your payment</strong><p>We'll check Venmo for ${money(b.total_cents, { decimals: 2 })} with note ${esc(b.ref_code)}. You'll see the address here once it's confirmed, usually within a few hours.</p></div></div>
+      ${demo && b.spot?.is_sample ? '<p class="fine">Demo: sample bookings confirm automatically in a few seconds.</p>' : ''}
     </div>`;
   } else if (b.status === 'confirmed') {
     right = `<div class="card card-pad stack">
-      <div class="notice notice-ok">${icon('check')}<div><strong>You're all set!</strong><p>The host confirmed your payment.</p></div></div>
+      <div class="notice notice-ok">${icon('check')}<div><strong>You're all set!</strong><p>Spotted confirmed your payment.</p></div></div>
       <div><div class="label">Address</div><p style="font-size:1.05rem;color:var(--ink);font-weight:700;margin:4px 0 8px">${esc(b.address || 'Ask the host for the address')}</p>
       ${b.address ? `<a class="btn btn-outline btn-sm" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}">${icon('pin')} Directions</a>` : ''}</div>
     </div>`;
   } else {
-    right = `<div class="card card-pad"><div class="notice">${icon('info')}<div><strong>This booking was cancelled</strong><p>If you already paid, message the host to arrange a refund on Venmo.</p></div></div><a class="btn btn-primary btn-block" style="margin-top:14px" href="#/find">Find another spot</a></div>`;
+    right = `<div class="card card-pad"><div class="notice">${icon('info')}<div><strong>This booking was cancelled</strong><p>If you already paid, email <a href="mailto:spottedparking@outlook.com">spottedparking@outlook.com</a> with your booking code ${esc(b.ref_code)} for a refund.</p></div></div><a class="btn btn-primary btn-block" style="margin-top:14px" href="#/find">Find another spot</a></div>`;
   }
 
   view.innerHTML = `
@@ -86,7 +88,7 @@ export default async function pay(view, { store, params, go, requireAuth }) {
   });
   view.querySelector('#paid')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
-    try { await store.markPaymentSent(b.id); toast('Thanks! The host will confirm shortly.'); } catch (ex) { toast(ex.message, 'err'); e.target.disabled = false; }
+    try { await store.markPaymentSent(b.id); toast('Thanks! Spotted will confirm shortly.'); } catch (ex) { toast(ex.message, 'err'); e.target.disabled = false; }
   });
   view.querySelector('#cancel')?.addEventListener('click', async () => {
     if (!confirm('Cancel this booking?')) return;

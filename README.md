@@ -11,12 +11,32 @@ Until Supabase is connected, the site runs in **demo mode**: everything works, b
 
 ## How booking and payment work
 
-1. A commuter searches by city, the CU building they want to park near, date, time and length, then books a spot. Picking a building sorts spots by distance to it.
-2. The payment page shows a QR code that opens the host's Venmo with the amount and a booking code (like `SP-AF5D67`) filled in. The commuter pays, then taps **I've sent the payment**.
-3. The host checks Venmo and taps **Payment received** on their dashboard.
-4. The commuter now sees the street address. Addresses stay hidden until then.
+Spotted collects every payment and keeps an 8% fee; owners get the other 92%.
 
-The database refuses double bookings, days the host doesn't offer, and dates that aren't listed game days. Commuters and hosts can chat about any spot.
+1. A commuter searches by city, the CU building they want to park near, date, time and length, then books a spot.
+2. The payment page shows a QR code for **Spotted's Venmo (@david-thumma)** with the amount and a booking code (like `SP-AF5D67`) filled in. The commuter pays, then taps **I've sent the payment**.
+3. A Spotted team member opens the **Team** page, finds that booking code in Venmo and taps **Payment received**. The commuter now sees the street address.
+4. The Team page lists what each owner is owed (one Venmo per owner covers all their bookings). After sending it, tap **I sent $X on Venmo**. Owners see "Paid out" on their dashboard.
+
+Owners see what they'll earn after the fee when they set prices, and their dashboard shows payouts on the way and paid out.
+
+The database refuses double bookings, days the host doesn't offer, and dates that aren't listed game days. Only Spotted team members can confirm payments or record payouts.
+
+### Spotted team members
+
+The team page is at `/#/team`. To make someone a team member, have them sign up on the site, then run in Supabase SQL Editor:
+
+```sql
+insert into public.admins (user_id) select id from auth.users where email = 'their@email.com';
+```
+
+To change the Venmo account or the fee:
+
+```sql
+update public.platform_settings set venmo_username = 'new-handle', fee_bps = 800;  -- 800 = 8%
+```
+
+The fee is locked in on each booking when it's made, so changing it only affects new bookings.
 
 ## Put it online
 
@@ -33,6 +53,7 @@ The database refuses double bookings, days the host doesn't offer, and dates tha
    - `supabase/migrations/20261018000001_spotted.sql` (tables, security rules, booking logic)
    - `supabase/migrations/20261018000002_spot_photos.sql` (photo storage)
    - `supabase/migrations/20261018000003_spot_locations.sql` (map location of each spot)
+   - `supabase/migrations/20261019000004_central_payments.sql` (Spotted Venmo, 8% fee, team page, payouts)
 3. **Authentication → URL Configuration:** set the Site URL to your Netlify URL.
 4. Optional, for easier testing: **Authentication → Sign In / Providers → Email**, turn off **Confirm email**. Leave it on for real launch.
 5. **Project Settings → API:** copy the Project URL and the publishable (anon) key.
@@ -67,5 +88,5 @@ Preview locally from the repo root with `npx serve public` or `python3 -m http.s
 ## Free-plan notes
 
 - Supabase pauses free projects after about a week with no activity. Opening the dashboard resumes it.
-- Venmo personal accounts are meant for friends and family. Hosts charging for parking regularly should use a Venmo business profile, per Venmo's terms.
+- Venmo personal accounts are meant for friends and family. Collecting payments for a business should go through a Venmo business profile, per Venmo's terms.
 - Database tests: `tests/schema_test.sql` runs the booking and security rules against a local Postgres with `tests/supabase_stub.sql`.

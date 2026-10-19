@@ -5,7 +5,7 @@ export const live = true;
 export function venmoDialog(store, user, onSaved) {
   modal(`
     <h2 class="modal-title">Your Venmo</h2>
-    <p class="muted modal-sub">Commuters pay you here. Use the username on your Venmo profile, without the @.</p>
+    <p class="muted modal-sub">Spotted sends your earnings here. Use the username on your Venmo profile, without the @.</p>
     <form class="form" id="vf">
       <label class="field"><span>Venmo username</span><div class="prefix"><b>@</b><input name="venmo" value="${esc(user.venmo_username || '')}" placeholder="Alex-Rivera" autocomplete="off" required /></div></label>
       <p class="form-error" hidden></p>
@@ -28,34 +28,40 @@ export default async function host(view, { store, requireAuth, rerender, go }) {
     view.innerHTML = `<section class="page narrow">
       <div class="card card-pad empty" style="padding:36px 22px">${icon('house')}
         <h1 style="font-size:1.6rem">Your driveway. Their spot.</h1>
-        <p>List a driveway, garage or lot near campus. Set your own schedule and price, and get paid on Venmo.</p>
+        <p>List a driveway, garage or lot near campus. Set your own schedule and price, and Spotted pays you on Venmo.</p>
         <div class="row" style="justify-content:center;flex-wrap:wrap"><a class="btn btn-primary" href="#/list">List your spot</a><button class="btn btn-ghost" id="si">Sign in to your dashboard</button></div>
       </div></section>`;
     view.querySelector('#si').onclick = async () => { if (await requireAuth('Sign in to manage your spots.')) rerender(); };
     return;
   }
 
-  const [spots, bookings] = await Promise.all([store.mySpots(), store.hostBookings()]);
-  const needs = bookings.filter((b) => b.status === 'payment_sent' || b.status === 'awaiting_payment');
-  const recent = bookings.filter((b) => !needs.includes(b)).slice(0, 8);
+  const [spots, bookings, settings] = await Promise.all([store.mySpots(), store.hostBookings(), store.getSettings()]);
+  const feePct = settings.fee_bps / 100;
+  const recent = bookings.slice(0, 10);
+  const sum = (bs) => bs.reduce((a, b) => a + b.payout_cents, 0);
+  const owed = sum(bookings.filter((b) => b.status === 'confirmed' && b.payout_status === 'owed'));
+  const paid = sum(bookings.filter((b) => b.payout_status === 'paid'));
   const statsFor = (id) => {
     const bs = bookings.filter((b) => b.spot_id === id && b.status !== 'cancelled');
-    return { count: bs.length, earned: bs.filter((b) => b.status === 'confirmed').reduce((a, b) => a + b.total_cents, 0) };
+    return { count: bs.length, earned: sum(bs.filter((b) => b.status === 'confirmed')) };
   };
+  const payoutPill = (b) => b.status === 'cancelled' ? statusPill('cancelled')
+    : b.status !== 'confirmed' ? '<span class="pill pill-muted">Waiting for payment</span>'
+    : b.payout_status === 'paid' ? '<span class="pill pill-ok">Paid out</span>'
+    : '<span class="pill pill-info">Payout on the way</span>';
 
-  const bookingRow = (b, attention) => `
-    <div class="card booking ${attention ? 'request' : ''}">
+  const bookingRow = (b) => `
+    <div class="card booking">
       <span class="avatar" style="width:52px;height:52px">${esc(initials(b.renter?.full_name))}</span>
       <div>
         <h3>${esc(b.renter?.full_name || 'Commuter')}</h3>
         <div class="meta">${esc(b.spot?.title || '')} · ${esc(fmtRange(b))}</div>
-        <div class="meta"><b style="color:var(--ink)">${money(b.total_cents, { decimals: 2 })}</b> · note ${esc(b.ref_code)}</div>
-        <div style="margin-top:4px">${statusPill(b.status)}</div>
+        <div class="meta">You earn <b style="color:var(--ink)">${money(b.payout_cents, { decimals: 2 })}</b> <span title="${money(b.total_cents, { decimals: 2 })} booking minus Spotted's ${feePct}% fee">of ${money(b.total_cents, { decimals: 2 })}</span></div>
+        <div style="margin-top:4px">${payoutPill(b)}</div>
       </div>
       <div class="actions">
-        ${attention ? `<button class="btn btn-ok btn-sm" data-confirm="${b.id}">${icon('check')} Payment received</button>` : ''}
         <button class="btn btn-ghost btn-sm" data-chat="${b.spot_id}|${b.renter_id}" aria-label="Message renter">${icon('chat')}</button>
-        ${b.status !== 'cancelled' ? `<button class="btn-danger-text" data-cancel="${b.id}">Cancel</button>` : ''}
+        ${b.status !== 'cancelled' && b.payout_status !== 'paid' ? `<button class="btn-danger-text" data-cancel="${b.id}">Cancel</button>` : ''}
       </div>
     </div>`;
 
@@ -67,7 +73,10 @@ export default async function host(view, { store, requireAuth, rerender, go }) {
       <span class="ico">${icon('wallet')}</span>
       <div class="spacer">
         <h3>Payouts ${u.venmo_username ? `to @${esc(u.venmo_username)}` : ''}</h3>
-        <p>${u.venmo_username ? 'Commuters pay you directly on Venmo. Confirm each payment below once it shows up.' : 'Add your Venmo username so commuters can pay you.'}</p>
+        <p>${u.venmo_username
+          ? `Spotted collects each booking and sends you ${100 - feePct}% on Venmo, usually within 2–3 days.`
+          : 'Add your Venmo username so Spotted can pay you.'}</p>
+        <div class="payout-stats"><span><b>${money(owed, { decimals: 2 })}</b> on the way</span><span><b>${money(paid, { decimals: 2 })}</b> paid out</span></div>
       </div>
       <button class="btn ${u.venmo_username ? 'btn-outline' : 'btn-primary'} btn-xs" id="venmo">${u.venmo_username ? 'Edit' : 'Add Venmo'}</button>
     </div>
@@ -98,19 +107,15 @@ export default async function host(view, { store, requireAuth, rerender, go }) {
         </div>
       </div>
       <div>
-        ${needs.length ? `<div class="section-title"><h2>Needs your attention</h2><span class="pill pill-info">${needs.length}</span></div>
-          <p class="muted" style="font-size:.85rem;margin-top:-6px">Check Venmo for the amount and note, then confirm. Confirming shares the address with the renter.</p>
-          <div class="list-tight">${needs.map((b) => bookingRow(b, true)).join('')}</div>` : ''}
         <div class="section-title"><h2>Recent Bookings</h2></div>
-        <div class="list-tight">${recent.length ? recent.map((b) => bookingRow(b, false)).join('') : '<div class="card card-pad muted" style="font-size:.9rem">Bookings will show up here.</div>'}</div>
+        <div class="list-tight">${recent.length ? recent.map((b) => bookingRow(b)).join('') : '<div class="card card-pad muted" style="font-size:.9rem">Bookings will show up here.</div>'}</div>
       </div>
     </div>
   </section>`;
 
   view.querySelector('#venmo').onclick = () => venmoDialog(store, u, rerender);
   const act = async (fn, msg) => { try { await fn(); if (msg) toast(msg); } catch (e) { toast(e.message, 'err'); } };
-  view.querySelectorAll('[data-confirm]').forEach((b) => { b.onclick = () => act(() => store.confirmPayment(b.dataset.confirm), 'Payment confirmed. The renter can now see the address.'); });
-  view.querySelectorAll('[data-cancel]').forEach((b) => { b.onclick = () => confirm('Cancel this booking? If they already paid, refund them on Venmo.') && act(() => store.cancelBooking(b.dataset.cancel), 'Booking cancelled'); });
+  view.querySelectorAll('[data-cancel]').forEach((b) => { b.onclick = () => confirm('Cancel this booking? If they already paid, Spotted will refund them.') && act(() => store.cancelBooking(b.dataset.cancel), 'Booking cancelled'); });
   view.querySelectorAll('[data-toggle]').forEach((b) => { b.onclick = () => act(() => store.setSpotStatus(b.dataset.toggle, b.dataset.status === 'active' ? 'paused' : 'active'), b.dataset.status === 'active' ? 'Spot paused. It won\'t show in search.' : 'Spot is live again'); });
   view.querySelectorAll('[data-delete]').forEach((b) => { b.onclick = () => confirm('Delete this spot and its bookings? This can\'t be undone.') && act(() => store.deleteSpot(b.dataset.delete), 'Spot deleted'); });
   view.querySelectorAll('[data-chat]').forEach((b) => {

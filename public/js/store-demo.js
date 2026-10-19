@@ -2,8 +2,11 @@
 // Used until Supabase keys are added to js/config.js. Same API as store-live.js.
 import { SAMPLE_SPOTS, nextSaturdays } from './samples.js';
 import { endDateFor, todayISO, parseISO, addDaysISO, shrinkToDataUrl } from './ui.js';
+import { CONFIG } from './config.js';
 
 const KEY = 'spotted.demo.v1';
+const SETTINGS = { venmo_username: CONFIG.platformVenmo || 'david-thumma', fee_bps: CONFIG.feeBps ?? 800 };
+const split = (total) => { const fee = Math.round(total * SETTINGS.fee_bps / 10000); return { fee_cents: fee, payout_cents: total - fee }; };
 const SAMPLE_HOST = { id: 'sample-host', email: 'team@spotted.demo', full_name: 'Spotted Team', venmo_username: 'Spotted-Demo' };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
 const now = () => new Date().toISOString();
@@ -32,6 +35,9 @@ function load() {
   db.spots.forEach((s) => {
     if (s.is_sample && s.lat == null) { const src = SAMPLE_SPOTS.find((x) => `sample-${x.key}` === s.id); if (src) { s.lat = src.lat; s.lng = src.lng; } }
   });
+  db.bookings.forEach((b) => {
+    if (b.payout_status === undefined) { Object.assign(b, split(b.total_cents)); b.payout_status = b.status === 'confirmed' ? 'owed' : 'not_due'; b.paid_out_at = null; }
+  });
   // Keep sample game days in the future.
   const sats = nextSaturdays();
   db.spots.forEach((s) => { if (s.is_sample && s.event_dates.length && s.event_dates.every((d) => d < todayISO())) s.event_dates = sats; });
@@ -47,6 +53,9 @@ const emit = () => listeners.forEach((fn) => fn());
 window.addEventListener('storage', (e) => { if (e.key === KEY) { load(); emit(); } });
 const fail = (msg) => { throw new Error(msg); };
 const me = () => db.users.find((u) => u.id === db.session) || null;
+// In demo mode the team account is the Spotted admin.
+const ADMIN_EMAIL = 'spottedparking@outlook.com';
+const isAdmin = (u) => !!u && u.email === ADMIN_EMAIL;
 const requireMe = () => me() || fail('Please sign in first.');
 const pub = (u) => u && { id: u.id, full_name: u.full_name, venmo_username: u.venmo_username };
 
@@ -64,7 +73,7 @@ function withHost(s) { return { ...s, host: pub(db.users.find((u) => u.id === s.
 function decorateBooking(b) {
   const spot = db.spots.find((s) => s.id === b.spot_id);
   const u = me();
-  const canSeeAddress = u && (u.id === b.owner_id || (u.id === b.renter_id && b.status === 'confirmed'));
+  const canSeeAddress = u && (u.id === b.owner_id || isAdmin(u) || (u.id === b.renter_id && b.status === 'confirmed'));
   return {
     ...b,
     spot: spot && { id: spot.id, title: spot.title, area: spot.area, city: spot.city, photos: spot.photos, spot_type: spot.spot_type, start_time: spot.start_time, end_time: spot.end_time, is_sample: spot.is_sample },
@@ -81,7 +90,7 @@ function sampleHostReact(kind, payload) {
       load();
       const b = db.bookings.find((x) => x.id === payload);
       if (b && b.status === 'payment_sent') {
-        b.status = 'confirmed'; b.updated_at = now(); save(); emit();
+        b.status = 'confirmed'; b.payout_status = 'owed'; b.updated_at = now(); save(); emit();
       }
     }, 2500);
   }
@@ -108,7 +117,8 @@ export const store = {
 
   onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
 
-  async getUser() { const u = me(); return u && { id: u.id, email: u.email, full_name: u.full_name, venmo_username: u.venmo_username }; },
+  async getUser() { const u = me(); return u && { id: u.id, email: u.email, full_name: u.full_name, venmo_username: u.venmo_username, is_admin: isAdmin(u) }; },
+  async getSettings() { return SETTINGS; },
 
   async signUp({ name, email, password }) {
     email = email.trim().toLowerCase();
@@ -165,7 +175,7 @@ export const store = {
 
   async createSpot(data, address, photoFiles = []) {
     const u = requireMe();
-    if (!u.venmo_username) fail('Add your Venmo username so commuters can pay you.');
+    if (!u.venmo_username) fail('Add your Venmo username so Spotted can pay you.');
     const photos = [];
     for (const f of photoFiles.slice(0, 3)) photos.push(await shrinkToDataUrl(f, 640));
     const spot = { ...data, photos, id: uid(), owner_id: u.id, status: 'active', is_sample: false, rating: null, review_count: 0, created_at: now() };
@@ -213,7 +223,9 @@ export const store = {
       id: uid(), spot_id, renter_id: u.id, owner_id: s.owner_id, period, start_date, end_date: end, quantity,
       total_cents: s[`price_${period}_cents`] * quantity, ref_code: `SP-${uid().replace(/-/g, '').slice(0, 6).toUpperCase()}`,
       status: 'awaiting_payment', created_at: now(), updated_at: now(),
+      payout_status: 'not_due', paid_out_at: null,
     };
+    Object.assign(b, split(b.total_cents));
     db.bookings.unshift(b); save(); emit();
     return b;
   },
@@ -238,19 +250,36 @@ export const store = {
     const u = requireMe();
     const b = db.bookings.find((x) => x.id === id && x.renter_id === u.id && x.status === 'awaiting_payment') || fail('This booking can\'t be marked as paid.');
     b.status = 'payment_sent'; b.updated_at = now(); save(); emit();
-    if (b.owner_id === SAMPLE_HOST.id) sampleHostReact('paid', b.id);
+    // Nobody is checking a real Venmo in the demo, so the "Spotted team" confirms sample bookings itself.
+    if (db.spots.find((s) => s.id === b.spot_id)?.is_sample) sampleHostReact('paid', b.id);
   },
 
   async confirmPayment(id) {
     const u = requireMe();
-    const b = db.bookings.find((x) => x.id === id && x.owner_id === u.id && ['awaiting_payment', 'payment_sent'].includes(x.status)) || fail('This booking can\'t be confirmed.');
-    b.status = 'confirmed'; b.updated_at = now(); save(); emit();
+    if (!isAdmin(u)) fail('Only the Spotted team can confirm payments.');
+    const b = db.bookings.find((x) => x.id === id && ['awaiting_payment', 'payment_sent'].includes(x.status)) || fail('This booking can\'t be confirmed.');
+    b.status = 'confirmed'; b.payout_status = 'owed'; b.updated_at = now(); save(); emit();
+  },
+
+  async markPaidOut(id) {
+    const u = requireMe();
+    if (!isAdmin(u)) fail('Only the Spotted team can record payouts.');
+    const b = db.bookings.find((x) => x.id === id && x.status === 'confirmed' && x.payout_status === 'owed') || fail('This payout can\'t be marked as paid.');
+    b.payout_status = 'paid'; b.paid_out_at = now(); b.updated_at = now(); save(); emit();
+  },
+
+  async allBookings() {
+    const u = requireMe();
+    if (!isAdmin(u)) fail('Only the Spotted team can see this page.');
+    return db.bookings.map(decorateBooking);
   },
 
   async cancelBooking(id) {
     const u = requireMe();
-    const b = db.bookings.find((x) => x.id === id && [x.renter_id, x.owner_id].includes(u.id) && x.status !== 'cancelled') || fail('This booking can\'t be cancelled.');
-    b.status = 'cancelled'; b.updated_at = now(); save(); emit();
+    const b = db.bookings.find((x) => x.id === id && x.status !== 'cancelled' && x.payout_status !== 'paid'
+      && ((x.renter_id === u.id && x.status === 'awaiting_payment') || x.owner_id === u.id || isAdmin(u)))
+      || fail('This booking can\'t be cancelled here. Message the Spotted team for help.');
+    b.status = 'cancelled'; b.payout_status = 'not_due'; b.updated_at = now(); save(); emit();
   },
 
   async openConversation(spotId, renterId = null) {
