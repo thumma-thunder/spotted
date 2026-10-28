@@ -238,7 +238,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 @media (min-width: 860px) { #toasts { bottom: 24px; } }
 
 /* --------------------------------------------------------------------- home */
-.hero { position: relative; color: #fff; overflow: hidden; background: #2D67D6 url('../assets/hero.svg') center bottom / cover no-repeat; }
+.hero { position: relative; color: #fff; overflow: hidden; background: #2D67D6 url('../assets/campus.jpg') center 40% / cover no-repeat; }
 .hero::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11, 34, 92, .78) 0%, rgba(11, 34, 92, .5) 45%, rgba(11, 34, 92, 0) 75%); }
 .hero-inner { position: relative; max-width: 1160px; margin: 0 auto; padding: 48px 16px 92px; }
 .hero h1 { color: #fff; font-size: clamp(2rem, 6vw, 3.3rem); max-width: 12ch; margin-bottom: 14px; }
@@ -271,7 +271,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 @media (min-width: 720px) { .split { grid-template-columns: 1fr 1fr; } }
 
 /* --------------------------------------------------------------------- find */
-.find-hero { background: #2D67D6 url('../assets/hero.svg') center 70% / cover no-repeat; position: relative; }
+.find-hero { background: #2D67D6 url('../assets/campus.jpg') center 35% / cover no-repeat; position: relative; }
 .find-hero::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11, 34, 92, .55), rgba(11, 34, 92, .25)); }
 .find-hero-inner { position: relative; max-width: 1160px; margin: 0 auto; padding: 26px 16px 0; color: #fff; }
 .find-hero h1 { color: #fff; font-size: 1.8rem; margin-bottom: 2px; }
