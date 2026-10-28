@@ -66,14 +66,22 @@ export default async function pay(view, { store, params, go, requireAuth }) {
       <div class="notice">${icon('clock')}<div><strong>Waiting for Spotted to confirm your payment</strong><p>We'll check Venmo for ${money(b.total_cents, { decimals: 2 })} with note ${esc(b.ref_code)}. You'll see the address here once it's confirmed, usually within a few hours.</p></div></div>
       ${demo && b.spot?.is_sample ? '<p class="fine">Demo: sample bookings confirm automatically in a few seconds.</p>' : ''}
     </div>`;
+  } else if (b.status === 'owner_review') {
+    right = `<div class="card card-pad stack">
+      <div class="notice">${icon('clock')}<div><strong>Payment received. Waiting for the spot owner</strong><p>Spotted has your ${money(b.total_cents, { decimals: 2 })}. ${esc(b.host?.full_name?.split(' ')[0] || 'The owner')} now confirms the spot is yours, and then you'll see the address here. If they can't take the booking, Spotted refunds you in full.</p></div></div>
+      ${demo && b.spot?.is_sample ? '<p class="fine">Demo: the sample owner confirms automatically in a few seconds.</p>' : ''}
+    </div>`;
   } else if (b.status === 'confirmed') {
     right = `<div class="card card-pad stack">
-      <div class="notice notice-ok">${icon('check')}<div><strong>You're all set!</strong><p>Spotted confirmed your payment.</p></div></div>
+      <div class="notice notice-ok">${icon('check')}<div><strong>You're all set!</strong><p>Spotted confirmed your payment and the owner confirmed your booking.</p></div></div>
       <div><div class="label">Address</div><p style="font-size:1.05rem;color:var(--ink);font-weight:700;margin:4px 0 8px">${esc(b.address || 'Ask the host for the address')}</p>
       ${b.address ? `<a class="btn btn-outline btn-sm" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}">${icon('pin')} Directions</a>` : ''}</div>
     </div>`;
   } else {
-    right = `<div class="card card-pad"><div class="notice">${icon('info')}<div><strong>This booking was cancelled</strong><p>If you already paid, email <a href="mailto:spottedparking@outlook.com">spottedparking@outlook.com</a> with your booking code ${esc(b.ref_code)} for a refund.</p></div></div><a class="btn btn-primary btn-block" style="margin-top:14px" href="#/find">Find another spot</a></div>`;
+    const refund = b.refund_status === 'refunded' ? `Spotted refunded your ${money(b.total_cents, { decimals: 2 })} on Venmo.`
+      : b.refund_status === 'owed' ? `Spotted will refund your ${money(b.total_cents, { decimals: 2 })} on Venmo, usually within 2–3 days.`
+      : null;
+    right = `<div class="card card-pad"><div class="notice">${icon('info')}<div><strong>This booking was cancelled</strong><p>${refund ? `${refund} Questions? Email <a href="mailto:spottedparking@outlook.com">spottedparking@outlook.com</a> with code ${esc(b.ref_code)}.` : `If you already paid, email <a href="mailto:spottedparking@outlook.com">spottedparking@outlook.com</a> with your booking code ${esc(b.ref_code)} for a refund.`}</p></div></div><a class="btn btn-primary btn-block" style="margin-top:14px" href="#/find">Find another spot</a></div>`;
   }
 
   view.innerHTML = `

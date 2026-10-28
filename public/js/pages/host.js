@@ -37,7 +37,8 @@ export default async function host(view, { store, requireAuth, rerender, go }) {
 
   const [spots, bookings, settings] = await Promise.all([store.mySpots(), store.hostBookings(), store.getSettings()]);
   const feePct = settings.fee_bps / 100;
-  const recent = bookings.slice(0, 10);
+  const toReview = bookings.filter((b) => b.status === 'owner_review');
+  const recent = bookings.filter((b) => b.status !== 'owner_review').slice(0, 10);
   const sum = (bs) => bs.reduce((a, b) => a + b.payout_cents, 0);
   const owed = sum(bookings.filter((b) => b.status === 'confirmed' && b.payout_status === 'owed'));
   const paid = sum(bookings.filter((b) => b.payout_status === 'paid'));
@@ -46,6 +47,7 @@ export default async function host(view, { store, requireAuth, rerender, go }) {
     return { count: bs.length, earned: sum(bs.filter((b) => b.status === 'confirmed')) };
   };
   const payoutPill = (b) => b.status === 'cancelled' ? statusPill('cancelled')
+    : b.status === 'owner_review' ? '<span class="pill pill-warn">Paid. Needs your OK</span>'
     : b.status !== 'confirmed' ? '<span class="pill pill-muted">Waiting for payment</span>'
     : b.payout_status === 'paid' ? '<span class="pill pill-ok">Paid out</span>'
     : '<span class="pill pill-info">Payout on the way</span>';
@@ -61,7 +63,8 @@ export default async function host(view, { store, requireAuth, rerender, go }) {
       </div>
       <div class="actions">
         <button class="btn btn-ghost btn-sm" data-chat="${b.spot_id}|${b.renter_id}" aria-label="Message renter">${icon('chat')}</button>
-        ${b.status !== 'cancelled' && b.payout_status !== 'paid' ? `<button class="btn-danger-text" data-cancel="${b.id}">Cancel</button>` : ''}
+        ${b.status === 'owner_review' ? `<button class="btn btn-ok btn-sm" data-accept="${b.id}">${icon('check')} Confirm</button><button class="btn-danger-text" data-decline="${b.id}">Decline</button>`
+          : b.status !== 'cancelled' && b.payout_status !== 'paid' ? `<button class="btn-danger-text" data-cancel="${b.id}">Cancel</button>` : ''}
       </div>
     </div>`;
 
@@ -80,6 +83,10 @@ export default async function host(view, { store, requireAuth, rerender, go }) {
       </div>
       <button class="btn ${u.venmo_username ? 'btn-outline' : 'btn-primary'} btn-xs" id="venmo">${u.venmo_username ? 'Edit' : 'Add Venmo'}</button>
     </div>
+
+    ${toReview.length ? `<div class="section-title"><h2>Confirm these bookings</h2><span class="pill pill-warn">${toReview.length}</span></div>
+    <p class="muted" style="font-size:.86rem;margin-top:-6px">Spotted has the commuter's payment. Confirm that your spot is free for these dates and they'll get the address. If you decline, Spotted refunds them.</p>
+    <div class="list-tight" style="margin-bottom:22px">${toReview.map((b) => bookingRow(b)).join('')}</div>` : ''}
 
     <div class="host-grid">
       <div>
@@ -116,6 +123,8 @@ export default async function host(view, { store, requireAuth, rerender, go }) {
   view.querySelector('#venmo').onclick = () => venmoDialog(store, u, rerender);
   const act = async (fn, msg) => { try { await fn(); if (msg) toast(msg); } catch (e) { toast(e.message, 'err'); } };
   view.querySelectorAll('[data-cancel]').forEach((b) => { b.onclick = () => confirm('Cancel this booking? If they already paid, Spotted will refund them.') && act(() => store.cancelBooking(b.dataset.cancel), 'Booking cancelled'); });
+  view.querySelectorAll('[data-accept]').forEach((b) => { b.onclick = () => act(() => store.ownerConfirm(b.dataset.accept), 'Booking confirmed. The commuter now has the address.'); });
+  view.querySelectorAll('[data-decline]').forEach((b) => { b.onclick = () => confirm('Decline this booking? Spotted will refund the commuter.') && act(() => store.cancelBooking(b.dataset.decline), 'Booking declined. Spotted will refund the commuter.'); });
   view.querySelectorAll('[data-toggle]').forEach((b) => { b.onclick = () => act(() => store.setSpotStatus(b.dataset.toggle, b.dataset.status === 'active' ? 'paused' : 'active'), b.dataset.status === 'active' ? 'Spot paused. It won\'t show in search.' : 'Spot is live again'); });
   view.querySelectorAll('[data-delete]').forEach((b) => { b.onclick = () => confirm('Delete this spot and its bookings? This can\'t be undone.') && act(() => store.deleteSpot(b.dataset.delete), 'Spot deleted'); });
   view.querySelectorAll('[data-chat]').forEach((b) => {

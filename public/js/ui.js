@@ -77,6 +77,7 @@ export const clockTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { ho
 export const STATUS = {
   awaiting_payment: { label: 'Awaiting payment', tone: 'warn' },
   payment_sent: { label: 'Payment sent', tone: 'info' },
+  owner_review: { label: 'Waiting for owner', tone: 'info' },
   confirmed: { label: 'Confirmed', tone: 'ok' },
   cancelled: { label: 'Cancelled', tone: 'muted' },
 };
