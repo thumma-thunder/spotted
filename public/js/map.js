@@ -1,5 +1,6 @@
 // Map of search results. Leaflet (vendored, BSD-2) with free OpenStreetMap tiles: no API key.
 import { esc, money, PERIODS } from './ui.js';
+import { ZONES, TIERS, zoneOutline } from './zones.js';
 
 const CAMPUS = [40.0076, -105.2659];
 let loading;
@@ -58,6 +59,21 @@ export async function mountSpotMap(el, { results, near }) {
   // Let people scroll the page past the map; zoom with the wheel once they click into it.
   map.on('focus click', () => map.scrollWheelZoom.enable());
   map.on('blur mouseout', () => map.scrollWheelZoom.disable());
+
+  // Shaded parking zones, matching the team's pricing tiers.
+  ZONES.forEach((z) => {
+    const c = TIERS[z.tier].color;
+    L.polygon(zoneOutline(z), { color: c, weight: 1, fillColor: c, fillOpacity: 0.18, interactive: true })
+      .bindTooltip(`${esc(z.name)} · ${TIERS[z.tier].label}`, { sticky: true })
+      .addTo(map);
+  });
+  const legend = L.control({ position: 'bottomleft' });
+  legend.onAdd = () => {
+    const d = L.DomUtil.create('div', 'map-legend');
+    d.innerHTML = Object.values(TIERS).map((t) => `<span><i style="background:${t.color}"></i>${t.label} zone</span>`).join('');
+    return d;
+  };
+  legend.addTo(map);
 
   const campusIcon = L.divIcon({ className: 'map-place', html: '<span>CU</span>', iconSize: [34, 34] });
   L.marker(CAMPUS, { icon: campusIcon, keyboard: false, title: 'CU Boulder campus' }).addTo(map);
