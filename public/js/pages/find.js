@@ -1,6 +1,10 @@
 import { esc, icon, money, PERIODS, SPOT_TYPES, headlinePrice, todayISO, parseISO, endDateFor, photoOf, rating, fmtDate } from '../ui.js';
 import { mountBuildingPicker, buildingByCode, milesBetween } from '../buildings-picker.js';
 import { spotPoint } from '../geo.js';
+import { mountSpotMap } from '../map.js';
+
+const MAP_KEY = 'spotted.findMap';
+const mapPref = () => { try { return localStorage.getItem(MAP_KEY) !== 'off'; } catch { return true; } };
 
 const DEFAULTS = { city: 'Boulder, CO', near: '', date: todayISO(), from: '08:00', to: '17:00', period: 'any', sort: 'price_asc', avail: '' };
 
@@ -49,14 +53,18 @@ export default async function find(view, { store, query, go }) {
   <section class="page find-results">
     <div class="results-head">
       <h2 id="count">Available Spots</h2>
-      <label class="row" style="gap:8px"><span class="muted" style="font-size:.84rem">Sort</span>
-        <select id="sort" aria-label="Sort results">
-          <option value="price_asc">Price: Low to High</option>
-          <option value="price_desc">Price: High to Low</option>
-          <option value="distance">${near ? 'Closest to building' : 'Closest to campus'}</option>
-        </select>
-      </label>
+      <div class="row" style="gap:10px">
+        <button type="button" class="btn btn-outline btn-sm" id="map-toggle" aria-controls="spot-map">${icon('pin')} <span>Hide map</span></button>
+        <label class="row" style="gap:8px"><span class="muted" style="font-size:.84rem">Sort</span>
+          <select id="sort" aria-label="Sort results">
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="distance">${near ? 'Closest to building' : 'Closest to campus'}</option>
+          </select>
+        </label>
+      </div>
     </div>
+    <div class="spot-map" id="spot-map" role="region" aria-label="Map of parking spots"></div>
     <div class="results" id="results"><p class="muted">Loading spots…</p></div>
   </section>`;
 
@@ -99,7 +107,7 @@ export default async function find(view, { store, query, go }) {
       const { period, cents } = headlinePrice(s, q.period === 'any' ? null : q.period);
       const pt = spotPoint(s);
       const dist = near ? (pt ? milesBetween(pt, near) : null) : s.distance_mi;
-      return { s, usable, full, period, cents, nextGame, dist };
+      return { s, usable, full, period, cents, nextGame, dist, pt };
     })
     .filter((r) => r.usable)
     .filter((r) => !q.avail || !r.full);
@@ -115,7 +123,11 @@ export default async function find(view, { store, query, go }) {
     ? `Spots near ${near.name} (${results.filter((r) => !r.full).length})`
     : `Available Spots (${results.filter((r) => !r.full).length})`;
   const list = view.querySelector('#results');
+  const mapEl = view.querySelector('#spot-map');
+  const mapBtn = view.querySelector('#map-toggle');
   if (!results.length) {
+    mapEl.hidden = true;
+    mapBtn.hidden = true;
     list.innerHTML = `<div class="card empty" style="grid-column:1/-1">${icon('search')}<h3>No spots match yet</h3>
       <p>Try a different date, a longer time window, or clear the building. Spotted is starting around CU Boulder.</p>
       <a class="btn btn-outline btn-sm" href="#/find">Reset search</a></div>`;
@@ -143,6 +155,30 @@ export default async function find(view, { store, query, go }) {
         ${r.full ? '<span class="pill pill-muted">Booked</span>' : '<span class="btn btn-primary btn-xs">Book</span>'}
       </div>
     </a>`).join('');
+
+  let spotMap = null;
+  let mapStarted = false;
+  const showMap = (on) => {
+    mapEl.hidden = !on;
+    mapBtn.querySelector('span').textContent = on ? 'Hide map' : 'Show map';
+    mapBtn.setAttribute('aria-expanded', String(on));
+    try { localStorage.setItem(MAP_KEY, on ? 'on' : 'off'); } catch { /* private mode */ }
+    if (on && !mapStarted) {
+      mapStarted = true;
+      mountSpotMap(mapEl, {
+        near,
+        results: results.map((r) => ({ ...r, href: link(r), photo: photoOf(r.s) })),
+      }).then((m) => { spotMap = m; });
+    } else if (on) spotMap?.refresh();
+  };
+  showMap(mapPref());
+  mapBtn.addEventListener('click', () => showMap(mapEl.hidden));
+  // Hovering a card lights up its pin.
+  list.querySelectorAll('.spot-card').forEach((card, i) => {
+    const id = results[i].s.id;
+    card.addEventListener('mouseenter', () => spotMap?.highlight(id, true));
+    card.addEventListener('mouseleave', () => spotMap?.highlight(id, false));
+  });
 }
 
 // "Koelbel Building: Leeds School of Business" -> "Koelbel Building" for tight card space.
