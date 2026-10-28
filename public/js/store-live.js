@@ -133,7 +133,9 @@ export async function createLiveStore({ supabaseUrl, supabaseKey }) {
     async hostBookings() { const u = requireUser(); return withAddresses(await run(sb.from('bookings').select(BOOKING).eq('owner_id', u.id).order('created_at', { ascending: false }))); },
     async markPaymentSent(id) { await run(sb.rpc('mark_payment_sent', { p_booking_id: id })); emit(); },
     async confirmPayment(id) { await run(sb.rpc('confirm_payment', { p_booking_id: id })); emit(); },
+    async ownerConfirm(id) { await run(sb.rpc('owner_confirm_booking', { p_booking_id: id })); emit(); },
     async markPaidOut(id) { await run(sb.rpc('mark_paid_out', { p_booking_id: id })); emit(); },
+    async markRefunded(id) { await run(sb.rpc('mark_refunded', { p_booking_id: id })); emit(); },
     async allBookings() {
       if (!user?.is_admin) throw new Error('Only the Spotted team can see this page.');
       return run(sb.from('bookings').select(BOOKING).order('created_at', { ascending: false }).limit(500));

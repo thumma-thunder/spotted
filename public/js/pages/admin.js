@@ -1,4 +1,4 @@
-// Spotted team page: confirm commuter payments and pay out spot owners.
+// Spotted team page: confirm commuter payments, pay out spot owners and send refunds.
 import { esc, icon, money, fmtRange, statusPill, venmoLink, toast, timeAgo } from '../ui.js';
 import { qrSvg } from '../vendor/qrcode.js';
 
@@ -15,6 +15,8 @@ export default async function admin(view, { store, requireAuth, rerender }) {
   const [all, settings] = await Promise.all([store.allBookings(), store.getSettings()]);
   const toCheck = all.filter((b) => b.status === 'payment_sent');
   const unpaid = all.filter((b) => b.status === 'awaiting_payment');
+  const withOwner = all.filter((b) => b.status === 'owner_review');
+  const refunds = all.filter((b) => b.refund_status === 'owed');
   const owed = all.filter((b) => b.status === 'confirmed' && b.payout_status === 'owed');
   const paid = all.filter((b) => b.payout_status === 'paid');
   const confirmed = all.filter((b) => b.status === 'confirmed');
@@ -73,19 +75,27 @@ export default async function admin(view, { store, requireAuth, rerender }) {
     <div class="page-head"><h1>Spotted Team</h1><p>Payments come in to <b>@${esc(settings.venmo_username)}</b>. Spotted keeps ${settings.fee_bps / 100}% and pays owners the rest.</p></div>
 
     <div class="stat-grid">
-      <div class="card stat"><span>Collected</span><b>${m(sum(confirmed, 'total_cents'))}</b></div>
+      <div class="card stat"><span>Collected</span><b>${m(sum([...withOwner, ...confirmed], 'total_cents'))}</b></div>
       <div class="card stat"><span>Spotted's fees</span><b>${m(sum(confirmed, 'fee_cents'))}</b></div>
       <div class="card stat"><span>Owed to owners</span><b>${m(sum(owed, 'payout_cents'))}</b></div>
       <div class="card stat"><span>Paid to owners</span><b>${m(sum(paid, 'payout_cents'))}</b></div>
     </div>
 
     <div class="section-title"><h2>1. Check Venmo</h2><span class="pill pill-info">${toCheck.length}</span></div>
-    <p class="muted" style="font-size:.86rem;margin-top:-6px">These commuters say they paid. Find the booking code in Spotted's Venmo, then confirm. Confirming sends them the address.</p>
+    <p class="muted" style="font-size:.86rem;margin-top:-6px">These commuters say they paid. Find the booking code in Spotted's Venmo, then confirm. The spot owner is asked to confirm next, and then the commuter gets the address.</p>
     <div class="list-tight">${toCheck.length ? toCheck.map(checkRow).join('') : '<div class="card card-pad muted" style="font-size:.9rem">Nothing to check right now.</div>'}</div>
+
+    ${refunds.length ? `<div class="section-title"><h2>Refunds to send</h2><span class="pill pill-warn">${refunds.length}</span></div>
+    <p class="muted" style="font-size:.86rem;margin-top:-6px">These paid bookings were declined or cancelled. Refund the commuter from Spotted's Venmo (find their payment by the booking code), then tap the button.</p>
+    <div class="list-tight">${refunds.map((b) => `<div class="card booking"><div class="ref-chip">${esc(b.ref_code)}</div><div><h3>Refund ${m(b.total_cents)} to ${esc(b.renter?.full_name || 'Commuter')}</h3><div class="meta">${esc(b.spot?.title || '')} · ${esc(fmtRange(b))} · cancelled ${timeAgo(b.updated_at)}</div></div><div class="actions"><button class="btn btn-primary btn-sm" data-refunded="${b.id}">${icon('check')} I sent the refund</button></div></div>`).join('')}</div>` : ''}
 
     <div class="section-title"><h2>2. Pay owners</h2><span class="pill pill-info">${byOwner.size}</span></div>
     <p class="muted" style="font-size:.86rem;margin-top:-6px">One Venmo per owner covers all their confirmed bookings. Tap the button after you send it.</p>
     <div class="list-tight">${byOwner.size ? [...byOwner.values()].map(ownerCard).join('') : '<div class="card card-pad muted" style="font-size:.9rem">No payouts owed.</div>'}</div>
+
+    ${withOwner.length ? `<div class="section-title"><h2>Waiting for owners</h2><span class="pill pill-muted">${withOwner.length}</span></div>
+    <p class="muted" style="font-size:.86rem;margin-top:-6px">Paid, waiting for the spot owner to confirm. Message the owner if one sits here too long, or cancel it and refund the commuter.</p>
+    <div class="list-tight">${withOwner.map((b) => `<div class="card booking"><div class="ref-chip">${esc(b.ref_code)}</div><div><h3>${m(b.total_cents)} · ${esc(b.renter?.full_name || 'Commuter')} → ${esc(b.host?.full_name || 'Owner')}</h3><div class="meta">${esc(b.spot?.title || '')} · ${esc(fmtRange(b))} · payment confirmed ${timeAgo(b.updated_at)}</div></div><div class="actions"><button class="btn-danger-text" data-cancel="${b.id}">Cancel</button></div></div>`).join('')}</div>` : ''}
 
     ${unpaid.length ? `<div class="section-title"><h2>Booked, not paid yet</h2><span class="pill pill-muted">${unpaid.length}</span></div>
     <p class="muted" style="font-size:.86rem;margin-top:-6px">These hold the spot for 30 minutes. Cancel any that were abandoned.</p>
@@ -93,15 +103,16 @@ export default async function admin(view, { store, requireAuth, rerender }) {
 
     <div class="section-title"><h2>History</h2></div>
     <div class="card card-pad history">
-      ${all.length ? all.slice(0, 40).map((b) => `<div class="payout-line"><span><b>${esc(b.ref_code)}</b> · ${esc(b.renter?.full_name || '')} → ${esc(b.host?.full_name || '')} · ${esc(b.spot?.title || '')}</span><span>${m(b.total_cents)} ${b.payout_status === 'paid' ? '<span class="pill pill-ok">Paid out</span>' : statusPill(b.status)}</span></div>`).join('') : '<span class="muted">No bookings yet.</span>'}
+      ${all.length ? all.slice(0, 40).map((b) => `<div class="payout-line"><span><b>${esc(b.ref_code)}</b> · ${esc(b.renter?.full_name || '')} → ${esc(b.host?.full_name || '')} · ${esc(b.spot?.title || '')}</span><span>${m(b.total_cents)} ${b.payout_status === 'paid' ? '<span class="pill pill-ok">Paid out</span>' : b.refund_status === 'refunded' ? '<span class="pill pill-muted">Refunded</span>' : b.refund_status === 'owed' ? '<span class="pill pill-warn">Refund owed</span>' : statusPill(b.status)}</span></div>`).join('') : '<span class="muted">No bookings yet.</span>'}
     </div>
   </section>`;
 
   const act = async (fn, msg) => { try { await fn(); toast(msg); rerender(); } catch (e) { toast(e.message, 'err'); } };
-  view.querySelectorAll('[data-confirm]').forEach((b) => { b.onclick = () => act(() => store.confirmPayment(b.dataset.confirm), 'Payment confirmed. The commuter now has the address.'); });
+  view.querySelectorAll('[data-confirm]').forEach((b) => { b.onclick = () => act(() => store.confirmPayment(b.dataset.confirm), 'Payment confirmed. Now the spot owner confirms the booking.'); });
   view.querySelectorAll('[data-cancel]').forEach((b) => {
     b.onclick = () => confirm('Cancel this booking? If they already paid, refund them from Spotted\'s Venmo.') && act(() => store.cancelBooking(b.dataset.cancel), 'Booking cancelled');
   });
+  view.querySelectorAll('[data-refunded]').forEach((b) => { b.onclick = () => act(() => store.markRefunded(b.dataset.refunded), 'Refund recorded.'); });
   view.querySelectorAll('[data-qr]').forEach((b) => { b.onclick = () => { const el = view.querySelector(`#qr-${b.dataset.qr}`); el.hidden = !el.hidden; }; });
   view.querySelectorAll('[data-paid]').forEach((b) => {
     b.onclick = () => act(async () => { for (const id of b.dataset.paid.split(',')) await store.markPaidOut(id); }, 'Payout recorded. The owner can see it on their dashboard.');

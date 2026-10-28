@@ -3,6 +3,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
  ('00000000-0000-0000-0000-00000000000a','spottedparking@outlook.com','{"full_name":"Spotted Team"}'),
  ('00000000-0000-0000-0000-00000000000b','rider@colorado.edu','{"full_name":"Kendra Nelson"}'),
  ('00000000-0000-0000-0000-00000000000c','other@colorado.edu','{}');
+insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000a');
 \i supabase/seed_sample_spots.sql
 select count(*) as sample_spots from public.spots;
 
@@ -50,9 +51,10 @@ update public.profiles set venmo_username='Kendra-Nelson' where id='00000000-000
 insert into public.spots (owner_id,title,city,spot_type,rent_options,price_day_cents) values ('00000000-0000-0000-0000-00000000000b','My spot','Boulder','driveway','{day}',500);
 do $$ begin update public.spots set rating=5 where owner_id='00000000-0000-0000-0000-00000000000b'; raise exception 'rating editable!'; exception when insufficient_privilege then raise notice 'ok: rating not editable'; end $$;
 
--- host confirms and replies
+-- team confirms the payment, the host (also the team account here) confirms the booking and replies
 set test.uid = '00000000-0000-0000-0000-00000000000a';
 select status from public.confirm_payment((select id from t));
+select status from public.owner_confirm_booking((select id from t));
 insert into public.messages (conversation_id, sender_id, body) values ((select id from c), '00000000-0000-0000-0000-00000000000a', 'Left side, thanks!');
 select count(*) as host_sees_messages from public.messages;
 set test.uid = '00000000-0000-0000-0000-00000000000b';

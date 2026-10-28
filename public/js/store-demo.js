@@ -37,6 +37,7 @@ function load() {
   });
   db.bookings.forEach((b) => {
     if (b.payout_status === undefined) { Object.assign(b, split(b.total_cents)); b.payout_status = b.status === 'confirmed' ? 'owed' : 'not_due'; b.paid_out_at = null; }
+    if (b.refund_status === undefined) { b.refund_status = 'none'; b.refunded_at = null; }
   });
   // Keep sample game days in the future.
   const sats = nextSaturdays();
@@ -65,7 +66,7 @@ async function hash(s) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-const activeBooking = (b) => b.status === 'payment_sent' || b.status === 'confirmed'
+const activeBooking = (b) => ['payment_sent', 'owner_review', 'confirmed'].includes(b.status)
   || (b.status === 'awaiting_payment' && Date.now() - new Date(b.created_at).getTime() < 30 * 60 * 1000);
 
 function withHost(s) { return { ...s, host: pub(db.users.find((u) => u.id === s.owner_id)) }; }
@@ -90,9 +91,17 @@ function sampleHostReact(kind, payload) {
       load();
       const b = db.bookings.find((x) => x.id === payload);
       if (b && b.status === 'payment_sent') {
-        b.status = 'confirmed'; b.payout_status = 'owed'; b.updated_at = now(); save(); emit();
+        b.status = 'owner_review'; b.updated_at = now(); save(); emit();
+        setTimeout(() => sampleHostReact('accept', payload), 2500);
       }
     }, 2500);
+  }
+  if (kind === 'accept') {
+    load();
+    const b = db.bookings.find((x) => x.id === payload);
+    if (b && b.status === 'owner_review') {
+      b.status = 'confirmed'; b.payout_status = 'owed'; b.updated_at = now(); save(); emit();
+    }
   }
   if (kind === 'message') {
     setTimeout(() => {
@@ -223,7 +232,7 @@ export const store = {
       id: uid(), spot_id, renter_id: u.id, owner_id: s.owner_id, period, start_date, end_date: end, quantity,
       total_cents: s[`price_${period}_cents`] * quantity, ref_code: `SP-${uid().replace(/-/g, '').slice(0, 6).toUpperCase()}`,
       status: 'awaiting_payment', created_at: now(), updated_at: now(),
-      payout_status: 'not_due', paid_out_at: null,
+      payout_status: 'not_due', paid_out_at: null, refund_status: 'none', refunded_at: null,
     };
     Object.assign(b, split(b.total_cents));
     db.bookings.unshift(b); save(); emit();
@@ -258,7 +267,22 @@ export const store = {
     const u = requireMe();
     if (!isAdmin(u)) fail('Only the Spotted team can confirm payments.');
     const b = db.bookings.find((x) => x.id === id && ['awaiting_payment', 'payment_sent'].includes(x.status)) || fail('This booking can\'t be confirmed.');
+    b.status = 'owner_review'; b.updated_at = now(); save(); emit();
+    if (db.spots.find((s) => s.id === b.spot_id)?.is_sample) setTimeout(() => sampleHostReact('accept', b.id), 2500);
+  },
+
+  async ownerConfirm(id) {
+    const u = requireMe();
+    const b = db.bookings.find((x) => x.id === id && x.owner_id === u.id && x.status === 'owner_review')
+      || fail('This booking can\'t be confirmed. Spotted has to confirm the payment first.');
     b.status = 'confirmed'; b.payout_status = 'owed'; b.updated_at = now(); save(); emit();
+  },
+
+  async markRefunded(id) {
+    const u = requireMe();
+    if (!isAdmin(u)) fail('Only the Spotted team can record refunds.');
+    const b = db.bookings.find((x) => x.id === id && x.refund_status === 'owed') || fail('This refund can\'t be marked as sent.');
+    b.refund_status = 'refunded'; b.refunded_at = now(); b.updated_at = now(); save(); emit();
   },
 
   async markPaidOut(id) {
@@ -279,6 +303,7 @@ export const store = {
     const b = db.bookings.find((x) => x.id === id && x.status !== 'cancelled' && x.payout_status !== 'paid'
       && ((x.renter_id === u.id && x.status === 'awaiting_payment') || x.owner_id === u.id || isAdmin(u)))
       || fail('This booking can\'t be cancelled here. Message the Spotted team for help.');
+    b.refund_status = ['owner_review', 'confirmed'].includes(b.status) ? 'owed' : 'none';
     b.status = 'cancelled'; b.payout_status = 'not_due'; b.updated_at = now(); save(); emit();
   },
 
