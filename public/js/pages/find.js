@@ -2,11 +2,12 @@ import { esc, icon, money, PERIODS, SPOT_TYPES, headlinePrice, todayISO, parseIS
 import { mountBuildingPicker, buildingByCode, milesBetween } from '../buildings-picker.js';
 import { spotPoint } from '../geo.js';
 
-const DEFAULTS = { city: 'Boulder, CO', near: '', date: todayISO(), from: '08:00', to: '17:00', period: 'any', sort: 'price_asc', avail: '' };
+// No date or time by default, so every active spot shows until the commuter narrows it down.
+const DEFAULTS = { city: 'Boulder, CO', near: '', date: '', from: '', to: '', period: 'any', sort: 'price_asc', avail: '' };
 
 export default async function find(view, { store, query, go }) {
   const q = { ...DEFAULTS, ...query };
-  if (q.date < todayISO()) q.date = todayISO();
+  if (q.date && q.date < todayISO()) q.date = todayISO();
   const near = buildingByCode(q.near);
   if (near && !query.sort) q.sort = 'distance';
 
@@ -27,7 +28,7 @@ export default async function find(view, { store, query, go }) {
               <input type="hidden" name="near" value="${esc(q.near)}" /></div>
           </div>
           <label class="field"><span>Date</span>
-            <div class="input-icon">${icon('calendar')}<input name="date" type="date" min="${todayISO()}" value="${esc(q.date)}" required /></div>
+            <div class="input-icon">${icon('calendar')}<input name="date" type="date" min="${todayISO()}" value="${esc(q.date)}" aria-label="Date (any day if empty)" /></div>
           </label>
           <div class="field"><span class="label" style="font-size:.74rem;color:var(--muted);font-weight:600">Time</span>
             <div class="grid-2" style="gap:6px"><input name="from" type="time" value="${esc(q.from)}" aria-label="From" /><input name="to" type="time" value="${esc(q.to)}" aria-label="Until" /></div>
@@ -78,18 +79,18 @@ export default async function find(view, { store, query, go }) {
 
   const [spots, booked] = await Promise.all([
     store.listSpots(),
-    store.bookedBetween(q.date, endDateFor(q.period === 'any' || q.period === 'event' ? 'day' : q.period, q.date, 1)),
+    q.date ? store.bookedBetween(q.date, endDateFor(q.period === 'any' || q.period === 'event' ? 'day' : q.period, q.date, 1)) : [],
   ]);
 
   const cityKey = q.city.split(',')[0].trim().toLowerCase();
-  const dow = parseISO(q.date).getDay();
+  const dow = q.date ? parseISO(q.date).getDay() : null;
   const results = spots
     .filter((s) => s.status === 'active')
     .filter((s) => !cityKey || s.city.toLowerCase().includes(cityKey))
     .filter((s) => q.period === 'any' || s.rent_options.includes(q.period))
     .map((s) => {
-      const nextGame = s.event_dates?.filter((d) => d >= q.date).sort()[0];
-      const fitsDay = s.avail_days.includes(dow) && (!q.from || s.start_time.slice(0, 5) <= q.from) && (!q.to || s.end_time.slice(0, 5) >= q.to);
+      const nextGame = s.event_dates?.filter((d) => d >= (q.date || todayISO())).sort()[0];
+      const fitsDay = (dow === null || s.avail_days.includes(dow)) && (!q.from || s.start_time.slice(0, 5) <= q.from) && (!q.to || s.end_time.slice(0, 5) >= q.to);
       const usable = q.period === 'event' ? !!nextGame
         : q.period === 'day' ? fitsDay
         : q.period === 'week' || q.period === 'month' ? true
@@ -113,7 +114,7 @@ export default async function find(view, { store, query, go }) {
 
   view.querySelector('#count').textContent = near
     ? `Spots near ${near.name} (${results.filter((r) => !r.full).length})`
-    : `Available Spots (${results.filter((r) => !r.full).length})`;
+    : `${q.date || q.from || q.to ? 'Available Spots' : 'All Spots'} (${results.filter((r) => !r.full).length})`;
   const list = view.querySelector('#results');
   if (!results.length) {
     list.innerHTML = `<div class="card empty" style="grid-column:1/-1">${icon('search')}<h3>No spots match yet</h3>
@@ -122,7 +123,9 @@ export default async function find(view, { store, query, go }) {
     return;
   }
   const link = (r) => {
-    const p = new URLSearchParams({ period: r.period, date: r.period === 'event' && r.nextGame ? r.nextGame : q.date });
+    const p = new URLSearchParams({ period: r.period });
+    const date = r.period === 'event' && r.nextGame ? r.nextGame : q.date;
+    if (date) p.set('date', date);
     if (near) p.set('near', q.near);
     return `#/spot/${encodeURIComponent(r.s.id)}?${p}`;
   };
