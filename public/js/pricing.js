@@ -1,17 +1,15 @@
-// Suggested price for a new listing: a base rate per rental period, adjusted
-// for distance to campus and the type of spot, then nudged toward what similar
-// nearby spots already charge.
+// Suggested price for a new listing: a base rate for the spot's parking zone
+// (see zones.js), adjusted for the type of spot. Owners still set the final
+// price; similar spots' prices are shown next to it for comparison.
 
-const BASE = { day: 1000, week: 4000, month: 14000, event: 2500 };
+// Weekly rates come from the team's zone slide (Tier 1 $25, Tier 2 $15-20).
+// Day, month and game-day rates keep the same proportions to the week.
+const BASE = {
+  1: { day: 600, week: 2500, month: 9000, event: 2500 },
+  2: { day: 500, week: 1800, month: 6500, event: 2000 },
+  none: { day: 400, week: 1500, month: 5500, event: 1500 },
+};
 const TYPE = { garage: 1.25, lot: 0.95, driveway: 1, other: 0.9 };
-
-function distanceFactor(mi) {
-  if (mi == null || Number.isNaN(mi)) return 1;
-  if (mi <= 0.5) return 1.2;
-  if (mi <= 1) return 1;
-  if (mi <= 2) return 0.85;
-  return 0.7;
-}
 
 const roundTo = (cents, step) => Math.max(step, Math.round(cents / step) * step);
 
@@ -22,13 +20,9 @@ export function comparablePrices(spots, { city, period, excludeOwner }) {
     .sort((a, b) => a - b);
 }
 
-export function suggestPrice({ period, distance_mi, spot_type, covered, comparables = [] }) {
-  let cents = BASE[period] * distanceFactor(distance_mi) * (TYPE[spot_type] ?? 1) * (covered && spot_type !== 'garage' ? 1.1 : 1);
-  if (comparables.length >= 3) {
-    const median = comparables[Math.floor(comparables.length / 2)];
-    cents = cents * 0.6 + median * 0.4;
-  }
-  const step = period === 'day' ? 100 : 500;
+export function suggestPrice({ period, zone, spot_type, covered, comparables = [] }) {
+  const cents = BASE[zone?.tier ?? 'none'][period] * (TYPE[spot_type] ?? 1) * (covered && spot_type !== 'garage' ? 1.1 : 1);
+  const step = period === 'month' ? 500 : 100;
   const suggested = roundTo(cents, step);
   return {
     suggested,

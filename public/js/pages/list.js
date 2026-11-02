@@ -2,6 +2,7 @@ import { esc, icon, money, PERIODS, SPOT_TYPES, DAY_NAMES, daysSummary, fmtTime,
 import { BOULDER_AREAS } from '../samples.js';
 import { geocode, spotPoint, milesToCampus } from '../geo.js';
 import { suggestPrice, comparablePrices, priceVerdict } from '../pricing.js';
+import { zoneAt, TIERS } from '../zones.js';
 
 const STEPS = ['Spot Details', 'Pricing & Availability', 'Payment Info', 'Review'];
 const fresh = () => ({
@@ -20,8 +21,22 @@ export default async function list(view, ctx) {
   const feePct = settings.fee_bps / 100;
   const net = (cents) => cents - Math.round(cents * settings.fee_bps / 10000);
 
+  // Where the spot is: looked up once per address, then reused for the zone price and on publish.
+  async function locate() {
+    const key = `${S.address.trim()}|${S.city.trim()}|${S.area.trim()}`;
+    if (S.ptKey === key) return;
+    let pt = await geocode(S.address.trim(), S.city.trim());
+    if (pt && milesToCampus(pt) > 40) pt = null;
+    S.pt = pt || spotPoint({ area: S.area.trim() });
+    S.ptKey = key;
+    const before = S.zone?.tier;
+    S.zone = zoneAt(S.pt);
+    if (S.zone?.tier !== before) S.touched = {}; // new zone, new suggestions
+
+  }
+
   const priceInfo = (period) => suggestPrice({
-    period, distance_mi: S.distance === '' ? null : Number(S.distance), spot_type: S.spot_type, covered: S.covered,
+    period, zone: S.zone, spot_type: S.spot_type, covered: S.covered,
     comparables: comparablePrices(allSpots, { city: S.city, period, excludeOwner: user?.id }),
   });
   const ensurePrices = () => S.options.forEach((p) => { if (!S.touched[p]) S.prices[p] = priceInfo(p).suggested; });
@@ -154,7 +169,11 @@ export default async function list(view, ctx) {
     }).join('');
 
     shell(`
-      <h2>2. Pricing &amp; Availability</h2><p class="lead">Slide to set your price. We suggest one based on distance to campus, spot type and similar spots nearby.</p>
+      <h2>2. Pricing &amp; Availability</h2><p class="lead">Slide to set your price. We suggest one based on your spot's parking zone and type. You decide the final price.</p>
+      <div class="zone-note" style="--zone:${S.zone ? TIERS[S.zone.tier].color : 'var(--muted)'}">${icon('pin')}
+        <span>${S.zone
+          ? `Your spot is in a <b>${TIERS[S.zone.tier].label} zone</b> (${esc(S.zone.name)}). Spots here usually go for ${TIERS[S.zone.tier].weekly}.`
+          : 'Your spot is outside Spotted\'s main zones near campus, so we suggest a little less than Tier 2.'}</span></div>
       ${blocks}
       <div class="form" style="margin-top:22px">
         <div class="field"><span>Days available</span>
@@ -261,6 +280,7 @@ export default async function list(view, ctx) {
     const btn = view.querySelector('#next');
     const problem = S.step === 0 ? check1() : S.step === 1 ? check2() : S.step === 2 ? await check3() : '';
     if (problem) { showErr(problem); return; }
+    if (S.step === 0) { btn.disabled = true; btn.textContent = 'Finding your spot…'; await locate(); }
     if (S.step < 3) { S.step++; draw(); window.scrollTo(0, 0); return; }
     btn.disabled = true; btn.textContent = 'Publishing…';
     try {
@@ -269,9 +289,8 @@ export default async function list(view, ctx) {
       if (u.venmo_username !== S.venmo) await store.updateProfile({ venmo_username: S.venmo });
       const has = (p) => S.options.includes(p);
       // Place the spot on the map so commuters can sort by distance to their building.
-      let pt = await geocode(S.address.trim(), S.city.trim());
-      if (pt && milesToCampus(pt) > 40) pt = null;
-      pt = pt || spotPoint({ area: S.area.trim() });
+      await locate();
+      const pt = S.pt;
       const distance = S.distance !== '' ? Math.round(Number(S.distance) * 10) / 10 : pt ? Math.round(milesToCampus(pt) * 10) / 10 : null;
       await store.createSpot({
         lat: pt?.lat ?? null, lng: pt?.lng ?? null,
